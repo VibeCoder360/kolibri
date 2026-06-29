@@ -942,6 +942,7 @@ class FacilityAPITestCase(APITestCase):
                 "learner_can_login_with_no_password",
                 "show_download_button_in_learn",
                 "enable_mark_attendance",
+                "enable_qr_login",
                 "extra_fields",
                 "picture_password_settings",
                 "description",

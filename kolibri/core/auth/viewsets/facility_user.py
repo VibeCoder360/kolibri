@@ -478,6 +478,28 @@ class FacilityUserViewSet(ValuesViewset, BulkDeleteMixin):
             # Bulk deletion
             return self.bulk_destroy(request, *args, **kwargs)
 
+    def list(self, request, *args, **kwargs):
+        # `profile_image` is a base64 data URL that can be up to ~150 KB per
+        # user. Returning it for every member of a large facility would bloat
+        # the roster response by tens of megabytes on every page load, so it
+        # is excluded from list responses and only returned on detail/retrieve.
+        original_values = self._values
+        self._values = tuple(v for v in original_values if v != "profile_image")
+        try:
+            response = super().list(request, *args, **kwargs)
+        finally:
+            self._values = original_values
+        # Strip the field from the serialized output as well, since the
+        # serializer's field list still includes it (returning None would
+        # mislead clients into thinking the user has no photo).
+        if isinstance(response.data, list):
+            for item in response.data:
+                item.pop("profile_image", None)
+        elif isinstance(response.data, dict) and "results" in response.data:
+            for item in response.data["results"]:
+                item.pop("profile_image", None)
+        return response
+
     def perform_bulk_destroy(self, objects):
         # Prevents superuser self-deletion during bulk operations (#13483).
         if objects.filter(id=self.request.user.id).exists():

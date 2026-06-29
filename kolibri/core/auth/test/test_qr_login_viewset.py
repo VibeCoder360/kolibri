@@ -6,7 +6,7 @@ from rest_framework import status
 
 from .. import models
 from ..constants import role_kinds
-from ..serializers import PublicFacilitySerializer
+from ..viewsets.facility import PublicFacilitySerializer
 from .helpers import create_superuser
 from .helpers import disable_qr_login
 from .helpers import DUMMY_PASSWORD
@@ -103,6 +103,13 @@ class SaveFacilityLoginSettingsQRTestCase(APITestCase):
         cls.admin = FacilityUserFactory.create(facility=cls.facility)
         cls.facility.add_admin(cls.admin)
 
+    def setUp(self):
+        super().setUp()
+        # Model default for `enable_qr_login` is True (see commit 58288062be),
+        # but the enable-path test needs to start from a disabled state to
+        # exercise the transition. Disable explicitly here.
+        disable_qr_login(self.facility)
+
     def _url(self):
         return reverse(
             "kolibri:core:facilitydataset-save-facility-login-settings",
@@ -117,8 +124,8 @@ class SaveFacilityLoginSettingsQRTestCase(APITestCase):
         mock_enqueued_job.job_id = "test-job-id"
         mock_storage.get_job.return_value = mock_enqueued_job
 
-    @patch("kolibri.core.auth.api.assign_qr_login_tokens_to_facility")
-    @patch("kolibri.core.auth.api.job_storage")
+    @patch("kolibri.core.auth.viewsets.facility_dataset.assign_qr_login_tokens_to_facility")
+    @patch("kolibri.core.auth.viewsets.facility_dataset.job_storage")
     def test_enable_qr_login_enqueues_task(self, mock_storage, mock_task):
         self._setup_task_mocks(mock_storage, mock_task)
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
@@ -135,8 +142,8 @@ class SaveFacilityLoginSettingsQRTestCase(APITestCase):
         dataset = FacilityDataset.objects.get(pk=self.facility.dataset_id)
         self.assertTrue(dataset.enable_qr_login)
 
-    @patch("kolibri.core.auth.api.assign_qr_login_tokens_to_facility")
-    @patch("kolibri.core.auth.api.job_storage")
+    @patch("kolibri.core.auth.viewsets.facility_dataset.assign_qr_login_tokens_to_facility")
+    @patch("kolibri.core.auth.viewsets.facility_dataset.job_storage")
     def test_enable_qr_login_does_not_call_task_directly(self, mock_storage, mock_task):
         self._setup_task_mocks(mock_storage, mock_task)
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
@@ -147,7 +154,7 @@ class SaveFacilityLoginSettingsQRTestCase(APITestCase):
         )
         mock_task.assert_not_called()
 
-    @patch("kolibri.core.auth.api.assign_qr_login_tokens_to_facility")
+    @patch("kolibri.core.auth.viewsets.facility_dataset.assign_qr_login_tokens_to_facility")
     def test_disable_qr_login_just_clears_flag(self, mock_task):
         dataset = self.facility.dataset
         dataset.enable_qr_login = True
@@ -177,10 +184,10 @@ class PublicFacilitySerializerQRTestCase(TestCase):
         self.assertIn("enable_qr_login", serializer.data)
         self.assertTrue(serializer.data["enable_qr_login"])
 
-    def test_enable_qr_login_defaults_to_false(self):
+    def test_enable_qr_login_defaults_to_true(self):
         serializer = PublicFacilitySerializer(self.facility)
         self.assertIn("enable_qr_login", serializer.data)
-        self.assertFalse(serializer.data["enable_qr_login"])
+        self.assertTrue(serializer.data["enable_qr_login"])
 
 
 class AssignQRTokensBulkTestCase(APITestCase):
@@ -213,8 +220,8 @@ class AssignQRTokensBulkTestCase(APITestCase):
     def _bulk_url(self):
         return reverse("kolibri:core:facilityuser-assign-qr-tokens")
 
-    @patch("kolibri.core.auth.api.assign_qr_login_tokens_to_facility")
-    @patch("kolibri.core.auth.api.job_storage")
+    @patch("kolibri.core.auth.viewsets.facility_user.assign_qr_login_tokens_to_facility")
+    @patch("kolibri.core.auth.viewsets.facility_user.job_storage")
     def test_bulk_assign_enqueues_task_with_user_ids(self, mock_storage, mock_task):
         self._setup_task_mocks(mock_storage, mock_task)
         user_ids = [self.learner1.id, self.learner2.id]
@@ -232,8 +239,8 @@ class AssignQRTokensBulkTestCase(APITestCase):
         self.assertEqual(called_data["facility_id"], self.facility.id)
         self.assertEqual(set(called_data["user_ids"]), set(user_ids))
 
-    @patch("kolibri.core.auth.api.assign_qr_login_tokens_to_facility")
-    @patch("kolibri.core.auth.api.job_storage")
+    @patch("kolibri.core.auth.viewsets.facility_dataset.assign_qr_login_tokens_to_facility")
+    @patch("kolibri.core.auth.viewsets.facility_dataset.job_storage")
     def test_bulk_assign_does_not_call_task_directly(self, mock_storage, mock_task):
         self._setup_task_mocks(mock_storage, mock_task)
         self.client.post(
@@ -243,20 +250,20 @@ class AssignQRTokensBulkTestCase(APITestCase):
         )
         mock_task.assert_not_called()
 
-    @patch("kolibri.core.auth.api.assign_qr_login_tokens_to_facility")
+    @patch("kolibri.core.auth.viewsets.facility_dataset.assign_qr_login_tokens_to_facility")
     def test_bulk_assign_requires_non_empty_user_ids(self, mock_task):
         response = self.client.post(self._bulk_url(), {}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         mock_task.validate_job_data.assert_not_called()
         mock_task.enqueue.assert_not_called()
 
-    @patch("kolibri.core.auth.api.assign_qr_login_tokens_to_facility")
+    @patch("kolibri.core.auth.viewsets.facility_dataset.assign_qr_login_tokens_to_facility")
     def test_bulk_assign_rejects_empty_user_ids_list(self, mock_task):
         response = self.client.post(self._bulk_url(), {"user_ids": []}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         mock_task.validate_job_data.assert_not_called()
 
-    @patch("kolibri.core.auth.api.assign_qr_login_tokens_to_facility")
+    @patch("kolibri.core.auth.viewsets.facility_dataset.assign_qr_login_tokens_to_facility")
     def test_non_admin_cannot_bulk_assign(self, mock_task):
         learner_client = self.client_class()
         learner_client.login(
