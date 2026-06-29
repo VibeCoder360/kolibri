@@ -61,7 +61,7 @@
 
 <script>
 
-  import { computed, nextTick, ref } from 'vue';
+  import { computed, nextTick, onMounted, ref } from 'vue';
   import useUser from 'kolibri/composables/useUser';
   import redirectBrowser from 'kolibri/utils/redirectBrowser';
   import { OptionsForSignIn } from 'kolibri-common/constants/Auth';
@@ -134,6 +134,10 @@
         return windowIsLandscape.value && isTouchDevice;
       });
 
+      onMounted(() => {
+        nextTick(() => passwordGridRef.value?.focusSentinel());
+      });
+
       watchForFacilityChange((newFacilityId, oldFacilityId) => {
         // If the facility ID is unset, it could mean the facility is no longer an option
         if (
@@ -154,9 +158,8 @@
 
       /**
        * Handles authentication once the user has entered a picture password and submits it
-       *
-       * @param {string} picturePassword
-       * @return {Promise<void>}
+       * @param {string} picturePassword - The picture-password sequence the user entered.
+       * @returns {Promise<void>}
        */
       async function prevalidate(picturePassword) {
         busy.value = true;
