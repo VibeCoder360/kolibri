@@ -2,12 +2,16 @@ import Vuex from 'vuex';
 import VueRouter from 'vue-router';
 import { render, screen, fireEvent, waitFor } from '@testing-library/vue';
 import { createLocalVue } from '@vue/test-utils';
+import { ref } from 'vue';
 import store from 'kolibri/store';
 import { coreString } from 'kolibri/uiText/commonCoreStrings';
 // eslint-disable-next-line import-x/named
 import useSnackbar, { useSnackbarMock } from 'kolibri/composables/useSnackbar';
+import useFacility, { useFacilityMock } from 'kolibri-common/composables/useFacility'; // eslint-disable-line import-x/named
 import { attendanceStrings } from 'kolibri-common/strings/attendanceStrings';
+import { qrLoginStrings } from 'kolibri-common/strings/qrLoginStrings';
 import classSummaryModule from '../../../modules/classSummary';
+import ClassSummaryResource from '../../../apiResources/classSummary';
 /* eslint-disable import-x/named */
 import { useAttendance, useAttendanceMock } from '../../../composables/useAttendance';
 /* eslint-enable import-x/named */
@@ -17,9 +21,36 @@ import AttendanceEditPage from '../AttendanceEditPage.vue';
 
 jest.mock('../../../composables/useAttendance');
 jest.mock('kolibri/composables/useSnackbar');
+jest.mock('kolibri-common/composables/useFacility');
+jest.mock('@zxing/browser', () => ({
+  BrowserMultiFormatReader: jest.fn().mockImplementation(() => ({
+    decodeFromImageUrl: jest.fn(),
+  })),
+}));
+jest.mock('../../../apiResources/classSummary', () => ({
+  __esModule: true,
+  default: { resolveQr: jest.fn() },
+}));
 jest.mock('kolibri-common/composables/usePageLoading', () => ({
   pageLoading: { value: false },
 }));
+
+// jsdom doesn't implement URL.createObjectURL/revokeObjectURL; provide stubs
+// so the QR-scan flow can run end-to-end in tests.
+const originalCreateObjectURL = URL.createObjectURL;
+const originalRevokeObjectURL = URL.revokeObjectURL;
+beforeAll(() => {
+  if (!originalCreateObjectURL) {
+    URL.createObjectURL = jest.fn(() => 'blob:mock');
+  }
+  if (!originalRevokeObjectURL) {
+    URL.revokeObjectURL = jest.fn();
+  }
+});
+afterAll(() => {
+  if (!originalCreateObjectURL) URL.createObjectURL = originalCreateObjectURL;
+  if (!originalRevokeObjectURL) URL.revokeObjectURL = originalRevokeObjectURL;
+});
 jest.mock('../../../composables/useCoreCoach', () => {
   const { ref, computed } = require('vue');
   return {
@@ -89,6 +120,7 @@ function setupTestStore(learners = MOCK_LEARNERS) {
 function renderNewPage({
   learners = MOCK_LEARNERS,
   createSessionResult = Promise.resolve({ id: 'new-session' }),
+  enableQrLogin = false,
 } = {}) {
   const createSession = jest.fn(() =>
     typeof createSessionResult === 'function' ? createSessionResult() : createSessionResult,
@@ -98,6 +130,9 @@ function renderNewPage({
 
   const createSnackbar = jest.fn();
   useSnackbar.mockImplementation(() => useSnackbarMock({ createSnackbar }));
+  useFacility.mockImplementation(() =>
+    useFacilityMock({ facilityConfig: ref({ enable_qr_login: enableQrLogin }) }),
+  );
 
   const router = new VueRouter({
     routes: [
@@ -399,6 +434,130 @@ describe('AttendanceNewPage', () => {
     const routeArg = pushSpy.mock.calls[0][0];
     expect(routeArg.name).toBe(PageNames.ATTENDANCE_HISTORY);
     expect(routeArg.query).toEqual({});
+  });
+
+  describe('Scan to mark present', () => {
+    function setFileOnInput(input, file) {
+      Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    }
+
+    function mockDecodeResult(token) {
+      // eslint-disable-next-line global-require
+      const { BrowserMultiFormatReader } = require('@zxing/browser');
+      BrowserMultiFormatReader.mockImplementation(() => ({
+        decodeFromImageUrl: jest.fn().mockResolvedValue({
+          getText: () => token,
+        }),
+      }));
+    }
+
+    function mockDecodeFailure() {
+      // eslint-disable-next-line global-require
+      const { BrowserMultiFormatReader } = require('@zxing/browser');
+      BrowserMultiFormatReader.mockImplementation(() => ({
+        decodeFromImageUrl: jest.fn().mockRejectedValue(new Error('no qr')),
+      }));
+    }
+
+    it('does not render the scan button when enable_qr_login is false', async () => {
+      renderNewPage({ enableQrLogin: false });
+      await waitFor(() => {
+        expect(screen.getByText(LEARNER_ALICE.name)).toBeInTheDocument();
+      });
+      expect(
+        screen.queryByRole('button', { name: qrLoginStrings.scanToMarkPresent$() }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('renders the scan button when enable_qr_login is true', async () => {
+      renderNewPage({ enableQrLogin: true });
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: qrLoginStrings.scanToMarkPresent$() }),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('resolves the scanned token server-side and marks that learner present', async () => {
+      mockDecodeResult('token-alice');
+      // The browser never holds learner tokens; the server resolves the scan.
+      ClassSummaryResource.resolveQr.mockResolvedValueOnce({
+        data: { id: 'learner-a', name: 'Alice' },
+      });
+      const { container } = renderNewPage({ enableQrLogin: true });
+      await waitFor(() => {
+        expect(screen.getByText(LEARNER_ALICE.name)).toBeInTheDocument();
+      });
+
+      const input = container.querySelector('input[type="file"]');
+      setFileOnInput(input, { name: 'alice.png', type: 'image/png' });
+      fireEvent.change(input);
+      await global.flushPromises();
+
+      expect(ClassSummaryResource.resolveQr).toHaveBeenCalledWith('test-class', 'token-alice');
+      await waitFor(() => {
+        expect(getLearnerSwitch('learner-a').checked).toBe(true);
+      });
+      expect(getLearnerSwitch('learner-b').checked).toBe(false);
+    });
+
+    it('shows "not in class" snackbar when the server cannot resolve the token', async () => {
+      mockDecodeResult('unknown-token');
+      // A 404 from the resolve endpoint => token not for a learner in this class.
+      ClassSummaryResource.resolveQr.mockRejectedValueOnce(new Error('404'));
+      const { container, createSnackbar } = renderNewPage({ enableQrLogin: true });
+      await waitFor(() => {
+        expect(screen.getByText(LEARNER_ALICE.name)).toBeInTheDocument();
+      });
+
+      const input = container.querySelector('input[type="file"]');
+      setFileOnInput(input, { name: 'unknown.png', type: 'image/png' });
+      fireEvent.change(input);
+      await global.flushPromises();
+
+      expect(createSnackbar).toHaveBeenCalledWith(qrLoginStrings.learnerNotInClass$());
+    });
+
+    it('shows "already marked present" snackbar when scanning a learner already present', async () => {
+      mockDecodeResult('token-alice');
+      ClassSummaryResource.resolveQr.mockResolvedValueOnce({
+        data: { id: 'learner-a', name: 'Alice' },
+      });
+      const { container, createSnackbar } = renderNewPage({ enableQrLogin: true });
+      await waitFor(() => {
+        expect(screen.getByText(LEARNER_ALICE.name)).toBeInTheDocument();
+      });
+
+      // Mark Alice present first
+      await fireEvent.click(getLearnerSwitch('learner-a'));
+      expect(getLearnerSwitch('learner-a').checked).toBe(true);
+
+      // Now scan her QR code
+      const input = container.querySelector('input[type="file"]');
+      setFileOnInput(input, { name: 'alice.png', type: 'image/png' });
+      fireEvent.change(input);
+      await global.flushPromises();
+
+      expect(createSnackbar).toHaveBeenCalledWith(
+        qrLoginStrings.alreadyMarkedPresent$({ name: LEARNER_ALICE.name }),
+      );
+    });
+
+    it('does nothing (and never calls the server) when the image has no decodable QR code', async () => {
+      mockDecodeFailure();
+      const { container, createSnackbar } = renderNewPage({ enableQrLogin: true });
+      await waitFor(() => {
+        expect(screen.getByText(LEARNER_ALICE.name)).toBeInTheDocument();
+      });
+
+      const input = container.querySelector('input[type="file"]');
+      setFileOnInput(input, { name: 'noqr.png', type: 'image/png' });
+      fireEvent.change(input);
+      await global.flushPromises();
+
+      expect(ClassSummaryResource.resolveQr).not.toHaveBeenCalled();
+      expect(createSnackbar).not.toHaveBeenCalled();
+    });
   });
 });
 

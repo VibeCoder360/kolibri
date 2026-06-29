@@ -16,6 +16,7 @@ from kolibri.core import error_constants
 from kolibri.core.api import ValuesMethodField
 from kolibri.core.api import ValuesViewset
 from kolibri.core.auth.tasks import assign_picture_passwords_to_facility
+from kolibri.core.auth.tasks import assign_qr_login_tokens_to_facility
 from kolibri.core.auth.utils.picture_passwords import are_picture_passwords_exhausted
 from kolibri.core.device.utils import allow_guest_access as _allow_guest_access
 from kolibri.core.device.utils import (
@@ -80,6 +81,7 @@ class FacilityDatasetSerializer(serializers.ModelSerializer):
             "learner_can_login_with_no_password",
             "show_download_button_in_learn",
             "enable_mark_attendance",
+            "enable_qr_login",
             "extra_fields",
             "picture_password_settings",
             "description",
@@ -179,6 +181,52 @@ class FacilityDatasetViewSet(ValuesViewset):
             "learner_can_login_with_no_password"
         )
         learner_can_edit_password = request.data.get("learner_can_edit_password")
+        new_enable_qr_login = request.data.get("enable_qr_login")
+
+        # QR login enabling. When flipping from disabled to enabled, enqueue
+        # the bulk-assignment task so all existing eligible learners receive a
+        # token. Disabling just flips the flag; we deliberately leave existing
+        # tokens intact so re-enabling later is cheap and idempotent.
+        if (
+            new_enable_qr_login is not None
+            and new_enable_qr_login
+            and not dataset.enable_qr_login
+        ):
+            dataset.enable_qr_login = True
+            dataset.save()
+
+            job, _ = assign_qr_login_tokens_to_facility.validate_job_data(
+                request.user,
+                data={"facility_id": facility.id},
+            )
+            job_id = assign_qr_login_tokens_to_facility.enqueue(job=job)
+            enqueued_job = job_storage.get_job(job_id)
+            return Response(
+                {
+                    "dataset": FacilityDatasetSerializer(dataset).data,
+                    "task": {
+                        "id": enqueued_job.job_id,
+                        "status": enqueued_job.state,
+                        "percentage": enqueued_job.percentage_progress,
+                        "cancellable": enqueued_job.cancellable,
+                        "facility_id": enqueued_job.facility_id,
+                        "extra_metadata": enqueued_job.extra_metadata,
+                    },
+                },
+                status=status.HTTP_202_ACCEPTED,
+            )
+
+        if (
+            new_enable_qr_login is not None
+            and not new_enable_qr_login
+            and dataset.enable_qr_login
+        ):
+            dataset.enable_qr_login = False
+            dataset.save()
+            return Response(
+                {"dataset": FacilityDatasetSerializer(dataset).data},
+                status=status.HTTP_200_OK,
+            )
 
         currently_enabled = dataset.picture_password_settings is not None
         enabling = not currently_enabled and new_pps is not None

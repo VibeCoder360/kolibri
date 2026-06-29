@@ -20,3 +20,5 @@ These guides are step by step guides for common tasks in getting started and wor
   working_with_urls_and_api_endpoints
   dev_data_setup
   multi_agent_setup
+  qr_login
+  deploy_kolibri_school_fork

@@ -127,6 +127,22 @@
             </td>
           </tr>
 
+          <tr v-if="showQrLoginRow">
+            <th>{{ myQRCode$() }}</th>
+            <td>
+              <UserQRCode
+                v-if="currentUser.qr_login_token"
+                data-testid="qr-login-token-display"
+                :token="currentUser.qr_login_token"
+                :size="120"
+              />
+              <KEmptyPlaceholder
+                v-else
+                data-testid="qr-login-token-empty"
+              />
+            </td>
+          </tr>
+
           <tr v-if="!isLearnerOnlyImport && canEditPassword">
             <th>{{ coreString('passwordLabel') }}</th>
             <td>
@@ -210,6 +226,7 @@
   import commonCoreStrings from 'kolibri/uiText/commonCoreStrings';
   import PermissionsIcon from 'kolibri-common/components/labels/PermissionsIcon';
   import UserPicturePassword from 'kolibri-common/components/UserPicturePassword';
+  import UserQRCode from 'kolibri-common/components/UserQRCode';
   import UserTypeDisplay from 'kolibri-common/components/UserTypeDisplay';
   import { PermissionTypes } from 'kolibri/constants';
   import useUser from 'kolibri/composables/useUser';
@@ -218,6 +235,7 @@
   import useTotalProgress from 'kolibri/composables/useTotalProgress';
   import useFacilities from 'kolibri-common/composables/useFacilities';
   import useFacility from 'kolibri-common/composables/useFacility';
+  import { qrLoginStrings } from 'kolibri-common/strings/qrLoginStrings';
   import { pageLoading } from 'kolibri-common/composables/usePageLoading';
   import useUserKind from '../../composables/useUserKind';
   import { RoutesMap } from '../../constants';
@@ -240,6 +258,7 @@
       GenderDisplayText,
       PermissionsIcon,
       UserPicturePassword,
+      UserQRCode,
       UserTypeDisplay,
     },
     mixins: [commonCoreStrings],
@@ -263,6 +282,7 @@
       const { facilities } = useFacilities();
       const { facilityConfig, fetchFacilities, updateFacilityConfig } = useFacility();
       const userPermissions = computed(() => pickBy(_userPermissions.value));
+      const { myQRCode$ } = qrLoginStrings;
 
       return {
         pageLoading,
@@ -285,6 +305,7 @@
         facilities,
         fetchFacilities,
         updateFacilityConfig,
+        myQRCode$,
       };
     },
     computed: {
@@ -321,6 +342,15 @@
           return true;
         }
         return this.isLearner;
+      },
+      showQrLoginRow() {
+        if (!this.facilityConfig?.enable_qr_login) {
+          return false;
+        }
+        if (this.isSuperuser && this.isLearnerOnlyImport) {
+          return true;
+        }
+        return this.userKind === UserKinds.LEARNER;
       },
       canEditPassword() {
         const learner_can_edit =

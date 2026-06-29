@@ -19,6 +19,7 @@ from rest_framework import status
 from rest_framework import viewsets
 from rest_framework.exceptions import ValidationError as RestValidationError
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 
 from kolibri.core import error_constants
 from kolibri.core.auth.constants.demographics import NOT_SPECIFIED
@@ -68,6 +69,14 @@ class CreateSessionSerializer(serializers.Serializer):
             )
         ],
     )
+    qr_login_token = serializers.CharField(
+        required=False,
+        default=None,
+        allow_null=True,
+        allow_blank=False,
+        min_length=16,
+        max_length=64,
+    )
 
     def validate(self, attrs):
         username = attrs.get("username")
@@ -76,6 +85,7 @@ class CreateSessionSerializer(serializers.Serializer):
         user_id = attrs.get("user_id")
         auth_token = attrs.get("auth_token")
         picture_password = attrs.get("picture_password")
+        qr_login_token = attrs.get("qr_login_token")
 
         request = self.context.get("request")
 
@@ -100,11 +110,20 @@ class CreateSessionSerializer(serializers.Serializer):
                 request, picture_password=picture_password, facility=facility
             )
 
+        # QR token authentication. Same isolation rule as picture password: if
+        # a qr_login_token was supplied we never fall through to
+        # username/password auth, even on failure.
+        if user is None and qr_login_token is not None and picture_password is None:
+            user = authenticate(
+                request, qr_login_token=qr_login_token, facility=facility
+            )
+
         # username/password authentication — intentionally skipped when
-        # picture_password was supplied (even if picture-password auth failed),
-        # so a failed picture-password attempt cannot fall through to a
-        # username/password login with whatever credentials were also sent.
-        if user is None and picture_password is None:
+        # picture_password or qr_login_token was supplied (even if that auth
+        # failed), so a failed alternative-credential attempt cannot fall
+        # through to a username/password login with whatever credentials were
+        # also sent.
+        if user is None and picture_password is None and qr_login_token is None:
             user = authenticate(
                 request, username=username, password=password, facility=facility
             )
@@ -114,7 +133,9 @@ class CreateSessionSerializer(serializers.Serializer):
             return attrs
 
         # Otherwise, throw a meaningful validation error
-        self._throw_validation_error(username, password, facility, picture_password)
+        self._throw_validation_error(
+            username, password, facility, picture_password, qr_login_token
+        )
 
     def _check_os_user(self, request, username):
         app_auth_token = request.COOKIES.get(APP_AUTH_TOKEN_COOKIE_NAME)
@@ -127,8 +148,27 @@ class CreateSessionSerializer(serializers.Serializer):
                 logger.error(e)
 
     def _throw_validation_error(
-        self, username, password, facility, picture_password=None
+        self,
+        username,
+        password,
+        facility,
+        picture_password=None,
+        qr_login_token=None,
     ):
+        if qr_login_token is not None:
+            raise RestValidationError(
+                detail={
+                    "qr_login_token": [
+                        {
+                            "id": error_constants.NOT_FOUND,
+                            "metadata": {
+                                "field": "qr_login_token",
+                                "message": "No learner found with that QR code.",
+                            },
+                        }
+                    ]
+                }
+            )
         if picture_password is not None:
             raise RestValidationError(
                 detail={
@@ -221,6 +261,14 @@ class CreateSessionSerializer(serializers.Serializer):
 
 @method_decorator([ensure_csrf_cookie], name="dispatch")
 class SessionViewSet(viewsets.ViewSet):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "session_signin"
+
+    def get_throttles(self):
+        if self.action == "create":
+            return super().get_throttles()
+        return []
+
     def create(self, request):
         # Only enforce this when running in an app
         if not allow_other_browsers_to_connect() and not valid_app_key_on_request(

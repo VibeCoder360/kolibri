@@ -102,6 +102,9 @@ class PublicFacilitySerializer(serializers.ModelSerializer):
     picture_password_settings = serializers.JSONField(
         source="dataset.picture_password_settings", read_only=True, allow_null=True
     )
+    enable_qr_login = serializers.BooleanField(
+        source="dataset.enable_qr_login", read_only=True
+    )
 
     class Meta:
         model = Facility
@@ -113,6 +116,7 @@ class PublicFacilitySerializer(serializers.ModelSerializer):
             "learner_can_sign_up",
             "on_my_own_setup",
             "picture_password_settings",
+            "enable_qr_login",
         )
 
 

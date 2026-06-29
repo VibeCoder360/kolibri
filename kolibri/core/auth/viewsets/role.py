@@ -1,6 +1,7 @@
 import logging
 
 from django.db import transaction
+from django.db.models import Q
 from django_filters.rest_framework import CharFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from django_filters.rest_framework import FilterSet
@@ -140,5 +141,11 @@ class RoleViewSet(BulkDeleteMixin, BulkCreateMixin, viewsets.ModelViewSet):
                 instances = [instances]
             user_ids = [role.user_id for role in instances]
             FacilityUser.objects.filter(
-                id__in=user_ids, picture_password__isnull=False
-            ).update(picture_password=None, _morango_dirty_bit=True)
+                id__in=user_ids,
+            ).filter(
+                Q(picture_password__isnull=False) | Q(qr_login_token__isnull=False)
+            ).update(
+                picture_password=None,
+                qr_login_token=None,
+                _morango_dirty_bit=True,
+            )

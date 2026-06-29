@@ -1,12 +1,17 @@
 import logging
 from uuid import UUID
 
+import base64
+import binascii
+import re
+
 from django.contrib.auth import update_session_auth_hash
 from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.http import Http404
+from django.shortcuts import get_object_or_404
 from django.utils.timezone import now
 from django_filters.rest_framework import BaseInFilter
 from django_filters.rest_framework import CharFilter
@@ -21,18 +26,20 @@ from rest_framework import decorators
 from rest_framework import filters
 from rest_framework import serializers
 from rest_framework import status
+from rest_framework.exceptions import ValidationError as RestValidationError
 from rest_framework.mixins import DestroyModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-
 from kolibri.core import error_constants
 from kolibri.core.api import ReadOnlyValuesViewset
 from kolibri.core.api import ValuesViewset
 from kolibri.core.api import ValuesViewsetOrderingFilter
 from kolibri.core.auth.permissions.general import _user_is_admin_for_own_facility
+from kolibri.core.auth.tasks import assign_qr_login_tokens_to_facility
 from kolibri.core.auth.tasks import cleanup_expired_deleted_users
 from kolibri.core.mixins import BulkDeleteMixin
 from kolibri.core.tasks.exceptions import JobRunning
+from kolibri.core.tasks.main import job_storage
 from kolibri.core.utils.pagination import OptionalPageNumberPagination
 
 from ..constants import role_kinds
@@ -49,8 +56,23 @@ from ..permissions import KolibriAuthPermissions
 from ..permissions import KolibriAuthPermissionsFilter
 from ..utils.picture_passwords import are_picture_passwords_exhausted
 from ..utils.picture_passwords import assign_picture_password
+from ..utils.qr_tokens import assign_qr_login_token
+from ..utils.qr_tokens import reassign_qr_login_token
 
 logger = logging.getLogger(__name__)
+
+# `profile_image` is a base64 data URL stored verbatim on the (synced) FacilityUser
+# row, so it must be validated server-side: the client resizes to ~20-30 KB, but
+# without these bounds a hostile client could store an arbitrarily large blob that
+# then replicates to every peer device via Morango.
+PROFILE_IMAGE_MAX_BYTES = 150 * 1024  # decoded image bytes
+# Generous outer bound on the raw string so we can reject huge payloads cheaply,
+# before allocating a decode buffer. Base64 inflates by ~4/3 plus the data-URL
+# prefix, so this comfortably covers PROFILE_IMAGE_MAX_BYTES.
+PROFILE_IMAGE_MAX_DATA_URL_CHARS = PROFILE_IMAGE_MAX_BYTES * 2
+PROFILE_IMAGE_DATA_URL_RE = re.compile(
+    r"^data:image/(?:jpeg|png|webp);base64,(.+)$", re.DOTALL
+)
 
 
 class UUIDInFilter(BaseInFilter, UUIDFilter):
@@ -245,9 +267,11 @@ class FacilityUserSerializer(serializers.ModelSerializer):
             "birth_year",
             "extra_demographics",
             "picture_password",
+            "qr_login_token",
+            "profile_image",
             "date_joined",
         )
-        read_only_fields = ("is_superuser", "picture_password")
+        read_only_fields = ("is_superuser", "picture_password", "qr_login_token")
 
     def save(self, **kwargs):
         instance = super().save(**kwargs)
@@ -271,7 +295,35 @@ class FacilityUserSerializer(serializers.ModelSerializer):
                     assign_picture_password(instance, instance.facility)
                 except NoAvailableSequences:
                     pass
+            if facility.dataset.enable_qr_login:
+                assign_qr_login_token(instance)
         return instance
+
+    def validate_profile_image(self, value):
+        """
+        Ensure `profile_image` is a reasonably-sized base64 image data URL.
+        An empty value (clearing the photo) is allowed.
+        """
+        if not value:
+            return value
+        if len(value) > PROFILE_IMAGE_MAX_DATA_URL_CHARS:
+            raise serializers.ValidationError(
+                "profile_image exceeds the maximum allowed size."
+            )
+        match = PROFILE_IMAGE_DATA_URL_RE.match(value)
+        if not match:
+            raise serializers.ValidationError(
+                "profile_image must be a base64-encoded JPEG, PNG, or WEBP data URL."
+            )
+        try:
+            decoded = base64.b64decode(match.group(1), validate=True)
+        except (binascii.Error, ValueError):
+            raise serializers.ValidationError("profile_image is not valid base64 data.")
+        if len(decoded) > PROFILE_IMAGE_MAX_BYTES:
+            raise serializers.ValidationError(
+                "profile_image exceeds the maximum allowed size."
+            )
+        return value
 
     def _validate_extra_demographics(self, attrs, facility):
         # Validate the extra demographics here, as we need access to the facility dataset
@@ -437,6 +489,81 @@ class FacilityUserViewSet(ValuesViewset, BulkDeleteMixin):
         # if the user is updating their own password, ensure they don't get logged out
         if self.request.user == instance:
             update_session_auth_hash(self.request, instance)
+
+    @decorators.action(detail=True, methods=["post"])
+    def rotate_qr_token(self, request, pk):
+        """
+        Generates a new QR login token for the user, invalidating any
+        previously-printed card. Only facility admins can call this;
+        learners cannot rotate their own tokens.
+        """
+        user = get_object_or_404(FacilityUser, pk=pk)
+        if not (
+            request.user.is_superuser
+            or request.user.has_role_for_collection(role_kinds.ADMIN, user.facility)
+        ):
+            raise PermissionDenied("Only facility admins can rotate QR tokens.")
+        reassign_qr_login_token(user)
+        return Response({"qr_login_token": user.qr_login_token})
+
+    @decorators.action(detail=True, methods=["post"])
+    def assign_qr_token(self, request, pk):
+        """
+        Assigns a QR login token to the user if they are eligible and don't
+        already have one. Idempotent: a no-op (returning the existing token)
+        if the user already has one. Only facility admins can call this.
+        """
+        user = get_object_or_404(FacilityUser, pk=pk)
+        if not (
+            request.user.is_superuser
+            or request.user.has_role_for_collection(role_kinds.ADMIN, user.facility)
+        ):
+            raise PermissionDenied("Only facility admins can assign QR tokens.")
+        assign_qr_login_token(user)
+        return Response({"qr_login_token": user.qr_login_token})
+
+    @decorators.action(
+        detail=False, methods=["post"], permission_classes=[IsAuthenticated]
+    )
+    def assign_qr_tokens(self, request):
+        """
+        Bulk-assign QR login tokens to the given learners, only for those that
+        do not already have one. Enqueues a background task and returns its job
+        info so the client can display progress. Only facility admins can call
+        this. Expects a non-empty ``user_ids`` list in the request body; the
+        facility is resolved from the users themselves.
+        """
+        user_ids = request.data.get("user_ids")
+        if not isinstance(user_ids, list) or not user_ids:
+            raise RestValidationError("A non-empty 'user_ids' list is required.")
+
+        first_user = get_object_or_404(FacilityUser, pk=user_ids[0])
+        facility = first_user.facility
+        if not (
+            request.user.is_superuser
+            or request.user.has_role_for_collection(role_kinds.ADMIN, facility)
+        ):
+            raise PermissionDenied("Only facility admins can assign QR tokens.")
+
+        job, _ = assign_qr_login_tokens_to_facility.validate_job_data(
+            request.user,
+            data={"facility_id": facility.id, "user_ids": user_ids},
+        )
+        job_id = assign_qr_login_tokens_to_facility.enqueue(job=job)
+        enqueued_job = job_storage.get_job(job_id)
+        return Response(
+            {
+                "task": {
+                    "id": enqueued_job.job_id,
+                    "status": enqueued_job.state,
+                    "percentage": enqueued_job.percentage_progress,
+                    "cancellable": enqueued_job.cancellable,
+                    "facility_id": enqueued_job.facility_id,
+                    "extra_metadata": enqueued_job.extra_metadata,
+                }
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
 
 
 class DeletedFacilityUserViewSet(

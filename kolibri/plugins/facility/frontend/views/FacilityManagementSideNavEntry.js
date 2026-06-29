@@ -2,6 +2,7 @@ import { UserKinds } from 'kolibri/constants';
 import { registerNavItem } from 'kolibri/composables/useNav';
 import urls from 'kolibri/urls';
 import { createTranslator } from 'kolibri/utils/i18n';
+import { qrLoginStrings } from 'kolibri-common/strings/qrLoginStrings';
 import baseRoutes from '../baseRoutes';
 
 const navStrings = createTranslator('FacilityManagementSideNavEntryStrings', {
@@ -46,6 +47,12 @@ registerNavItem({
         route: baseRoutes.users.path,
         icon: 'people',
         name: baseRoutes.users.name,
+      },
+      {
+        label: qrLoginStrings.idCards$(),
+        route: baseRoutes.idCards.path,
+        icon: 'people',
+        name: baseRoutes.idCards.name,
       },
       {
         label: navStrings.$tr('settingsLabel'),
