@@ -1,22 +1,7 @@
 name: Publish packages to npm
+# Disabled on school fork — auto-publish removed. Manual dispatch only,
+# requires npm token. See SCHOOL_FORK_CHANGES.md.
 on:
-  push:
-    branches:
-      - develop
-    paths:
-      - 'packages/browserslist-config-kolibri/package.json'
-      - 'packages/eslint-plugin-kolibri/package.json'
-      - 'packages/kolibri/package.json'
-      - 'packages/kolibri-app/package.json'
-      - 'packages/kolibri-build/package.json'
-      - 'packages/kolibri-format/package.json'
-      - 'packages/kolibri-glob/package.json'
-      - 'packages/kolibri-i18n/package.json'
-      - 'packages/kolibri-jest-config/package.json'
-      - 'packages/kolibri-logging/package.json'
-      - 'packages/kolibri-module/package.json'
-      - 'packages/kolibri-plugin-data/package.json'
-      - 'packages/kolibri-viewer/package.json'
   workflow_dispatch:
     inputs:
       npm_package:

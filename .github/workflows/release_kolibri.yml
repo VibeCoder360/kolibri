@@ -1,7 +1,12 @@
 name: Release Kolibri
+# Disabled on school fork — use release_school.yml instead.
+# See SCHOOL_FORK_CHANGES.md. To re-enable after an upstream sync,
+# restore the original trigger:
+#   on:
+#     release:
+#       types: [published]
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
 permissions:
   contents: write
   packages: write

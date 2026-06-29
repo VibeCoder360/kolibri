@@ -1,7 +1,7 @@
 name: Handle contributor comment on GitHub issue
+# Disabled on school fork — needs LE Bot secrets. See SCHOOL_FORK_CHANGES.md.
 on:
-  issue_comment:
-    types: [created]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

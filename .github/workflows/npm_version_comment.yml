@@ -1,9 +1,7 @@
 name: npm Package Version Comment
+# Disabled on school fork — needs LE Bot secrets. See SCHOOL_FORK_CHANGES.md.
 on:
-  workflow_run:
-    workflows: [npm Package Version Check]
-    types:
-      - completed
+  workflow_dispatch:
 permissions:
   contents: read
   pull-requests: write

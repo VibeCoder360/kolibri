@@ -1,7 +1,7 @@
 name: Update community pull requests spreadsheet
+# Disabled on school fork — needs LE Bot + GCP secrets. See SCHOOL_FORK_CHANGES.md.
 on:
-  pull_request_target:
-    types: [assigned, unassigned, opened, closed, reopened, edited, review_requested, review_request_removed]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

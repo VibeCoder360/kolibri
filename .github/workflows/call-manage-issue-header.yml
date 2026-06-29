@@ -1,7 +1,7 @@
 name: Manage issue header
+# Disabled on school fork — needs LE Bot secrets. See SCHOOL_FORK_CHANGES.md.
 on:
-  issues:
-    types: [opened, reopened, labeled, unlabeled]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

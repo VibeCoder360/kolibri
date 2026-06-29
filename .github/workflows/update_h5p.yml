@@ -1,9 +1,6 @@
 name: Update H5P JS library
+# Disabled on school fork — needs LE Bot secrets. See SCHOOL_FORK_CHANGES.md.
 on:
-  schedule:
-    # Runs at 00:00 UTC on Wednesday
-    - cron: '0 0 * * 3'
-  # Optional: Allow manual triggering
   workflow_dispatch:
 permissions:
   contents: read

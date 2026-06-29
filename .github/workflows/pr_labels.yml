@@ -1,5 +1,7 @@
 name: PR Labels
-on: [pull_request_target]
+# Disabled on school fork — uses LE Bot token for label management. See SCHOOL_FORK_CHANGES.md.
+on:
+  workflow_dispatch:
 permissions:
   contents: read
   pull-requests: write
