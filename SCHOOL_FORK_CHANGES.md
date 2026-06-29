@@ -39,6 +39,7 @@ These were committed before this doc existed and are preserved as-is:
 | File | Customization |
 |------|---------------|
 | `.github/workflows/build_whl.yml` | Removed webpack + cext cache restore steps (caches were primed by `warm_build_cache.yml`, which is not present on this fork). |
+| `.github/workflows/build_whl.yml` | Added "Set Kolibri version from tag (fork override)" step that sets `SETUPTOOLS_SCM_PRETEND_VERSION` from the GitHub ref, converting `v0.19.4-schoolN` → `0.19.4.postN`. The upstream `pyproject.toml` `tag_regex` only accepts `vX.Y.Z` or `vX.Y.Z-{alpha,beta,rc}N`, so school tags would otherwise fail at parse time under setuptools-scm 9.x. |
 | `.github/workflows/container_image_publish.yml` | Stripped to remove Docker Hub dependency. |
 | `.github/workflows/warm_build_cache.yml` | Not present on this fork (was deleted). |
 

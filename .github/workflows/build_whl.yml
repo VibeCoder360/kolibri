@@ -42,6 +42,19 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Install Python dependencies
         run: uv sync --group dev
+      - name: Set Kolibri version from tag (fork override)
+        # School fork customization: the upstream pyproject.toml tag_regex only
+        # accepts vX.Y.Z or vX.Y.Z-{alpha,beta,rc}N. Our school tags
+        # (v0.19.4-schoolN) don't match, which makes setuptools-scm 9.x assert
+        # at parse time. SETUPTOOLS_SCM_PRETEND_VERSION bypasses parsing entirely.
+        # See SCHOOL_FORK_CHANGES.md.
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${VERSION//-school/.post}"
+          echo "Pretending version: $VERSION (from tag $GITHUB_REF_NAME)"
+          echo "SETUPTOOLS_SCM_PRETEND_VERSION=$VERSION" >> "$GITHUB_ENV"
       - name: Build Kolibri
         run: make dist
       - name: Get WHL filename
