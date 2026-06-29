@@ -38,10 +38,11 @@ These were committed before this doc existed and are preserved as-is:
 
 | File | Customization |
 |------|---------------|
-| `.github/workflows/release_kolibri.yml` (line ~92) | `exe:` job points at `VibeCoder360/kolibri-installer-windows@main` instead of `learningequality/...` (uses Python 3.10). |
 | `.github/workflows/build_whl.yml` | Removed webpack + cext cache restore steps (caches were primed by `warm_build_cache.yml`, which is not present on this fork). |
 | `.github/workflows/container_image_publish.yml` | Stripped to remove Docker Hub dependency. |
 | `.github/workflows/warm_build_cache.yml` | Not present on this fork (was deleted). |
+
+> **Note on the previous Windows installer fork**: commit `984f36dd` (Jun 24) previously pointed the EXE build at `VibeCoder360/kolibri-installer-windows@main` with Python 3.10. That repo has since been deleted, so both `release_kolibri.yml` and `release_school.yml` now point back at the upstream `learningequality/kolibri-installer-windows@v1.6.9` (Python 3.8). To restore the Python 3.10 behavior, re-create the fork at `VibeCoder360/kolibri-installer-windows` and revert these references.
 
 ## Workflows that already auto-disable on forks
 
