@@ -9,13 +9,6 @@ for learners in a Kolibri facility. QR code sign-in lets young learners sign
 in by holding a printed credential card up to a device camera, instead of
 typing a username and password.
 
-.. note::
-
-   QR code sign-in is currently behind an **English-only** feature flag, the
-   same gate used for picture-password sign-in and attendance-taking. It will
-   be unlocked for other languages in a future release once the icon/card
-   strings have been translated.
-
 When to use QR code sign-in
 ===========================
 

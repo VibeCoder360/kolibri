@@ -17,7 +17,7 @@
 
 <script>
 
-  import { ref, watch, onMounted } from 'vue';
+  import { ref, computed, watch, onMounted } from 'vue';
   import QRCode from 'qrcode';
   import KCircularLoader from 'kolibri-design-system/lib/loaders/KCircularLoader';
   import { qrLoginStrings } from 'kolibri-common/strings/qrLoginStrings';
@@ -80,18 +80,16 @@
       onMounted(generate);
       watch(() => [props.token, props.size, props.margin], generate);
 
+      const imgStyle = computed(() => ({
+        width: props.size + 'px',
+        height: props.size + 'px',
+      }));
+
       return {
         qrDataUrl,
         altText: myQRCode$(),
+        imgStyle,
       };
-    },
-    computed: {
-      imgStyle() {
-        return {
-          width: this.size + 'px',
-          height: this.size + 'px',
-        };
-      },
     },
   };
 

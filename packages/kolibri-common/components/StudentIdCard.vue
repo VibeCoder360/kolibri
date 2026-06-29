@@ -116,6 +116,7 @@
       <div
         v-if="uploading || regenerating || assigning"
         class="loading-overlay"
+        :style="{ backgroundColor: $themeTokens.surface + 'B3' }"
       >
         <KCircularLoader :delay="false" />
       </div>
@@ -393,7 +394,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: rgba(255, 255, 255, 0.7);
     border-radius: 8px;
   }
 

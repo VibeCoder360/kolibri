@@ -6,6 +6,10 @@ export const qrLoginStrings = createTranslator('QRLoginStrings', {
     message: 'Scan your QR code',
     context: 'Title on the QR sign-in page asking the learner to scan their card.',
   },
+  qrSignInDocumentTitle: {
+    message: 'Sign in to Kolibri',
+    context: 'User sign-in page <title> for the QR code scanning page.',
+  },
   scanQRCodeDescription: {
     message: 'Hold your card so the camera can see the QR code',
     context: 'Instructions shown beneath the scanner on the QR sign-in page.',

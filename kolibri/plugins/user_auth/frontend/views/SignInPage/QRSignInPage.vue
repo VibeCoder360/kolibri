@@ -78,7 +78,7 @@
     name: 'QRSignInPage',
     metaInfo() {
       return {
-        title: this.$tr('documentTitle'),
+        title: this.documentTitle,
       };
     },
     components: {
@@ -94,7 +94,7 @@
       const route = useRoute();
       const { login } = useUser();
       const { createSnackbar } = useSnackbar();
-      const { scanQRCodeTitle$, scanQRCodeDescription$, wrongQRCode$ } = qrLoginStrings;
+      const { scanQRCodeTitle$, scanQRCodeDescription$, wrongQRCode$, qrSignInDocumentTitle$ } = qrLoginStrings;
       const { nextParam, defaultRoute, getFacilitySelectionRoute } = useAuthRouter(route);
       const { hasMultipleFacilities, facilityId, signInOptions } = useAuthFlow();
       const { watchForFacilityChange, watchForFacilityConfigChange } = useAuthWatcher();
@@ -250,13 +250,8 @@
         scanQRCodeTitle$,
         scanQRCodeDescription$,
         wrongQRCode$,
+        documentTitle: qrSignInDocumentTitle$(),
       };
-    },
-    $trs: {
-      documentTitle: {
-        message: 'Sign in to Kolibri',
-        context: 'User sign-in page for scanning a QR code.',
-      },
     },
   };
 
