@@ -1,22 +1,20 @@
 """
 Helper functions for use across the user/auth/permission-related tests.
 """
-
 from django.core.cache import caches
 from django.core.cache.backends.base import InvalidCacheBackendError
 from rest_framework.test import APIClient
 from rest_framework.test import APITestCase
 from rest_framework.test import APITransactionTestCase
 
-from kolibri.core.auth.constants import role_kinds
-from kolibri.core.device.models import DevicePermissions
-from kolibri.core.device.utils import provision_device as _provision_device  # noqa
-
 from ..models import Classroom
 from ..models import Facility
 from ..models import FacilityDataset
 from ..models import FacilityUser
 from ..models import LearnerGroup
+from kolibri.core.auth.constants import role_kinds
+from kolibri.core.device.models import DevicePermissions
+from kolibri.core.device.utils import provision_device as _provision_device  # noqa
 
 DUMMY_PASSWORD = "password"
 
@@ -92,6 +90,18 @@ def disable_picture_password(facility, passwordless=False):
     dataset.learner_can_login_with_no_password = passwordless
     dataset.learner_can_edit_password = not passwordless
     dataset.picture_password_settings = None
+    dataset.save()
+
+
+def enable_qr_login(facility):
+    dataset = facility.dataset
+    dataset.enable_qr_login = True
+    dataset.save()
+
+
+def disable_qr_login(facility):
+    dataset = facility.dataset
+    dataset.enable_qr_login = False
     dataset.save()
 
 

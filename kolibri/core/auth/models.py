@@ -18,7 +18,6 @@ object, which grants the user a role with respect to the ``Collection`` and all 
 object also stores the "kind" of the role (currently, one of "admin" or "coach"), which affects what permissions the
 user gains through the ``Role``.
 """
-
 import logging
 from threading import local
 
@@ -40,30 +39,6 @@ from morango.models import SyncableModelManager
 from morango.models import SyncableModelQuerySet
 from morango.models import UUIDField
 from mptt.models import TreeForeignKey
-
-from kolibri.core import error_constants
-from kolibri.core.auth.constants.demographics import choices as GENDER_CHOICES
-from kolibri.core.auth.constants.demographics import custom_demographics_schema
-from kolibri.core.auth.constants.demographics import DEFERRED
-from kolibri.core.auth.constants.demographics import DescriptionTranslationValidator
-from kolibri.core.auth.constants.demographics import EnumValuesValidator
-from kolibri.core.auth.constants.demographics import FacilityUserDemographicValidator
-from kolibri.core.auth.constants.demographics import LabelTranslationValidator
-from kolibri.core.auth.constants.demographics import NOT_SPECIFIED
-from kolibri.core.auth.constants.demographics import UniqueIdsValidator
-from kolibri.core.auth.constants.morango_sync import ScopeDefinitions
-from kolibri.core.device.hooks import GetOSUserHook
-from kolibri.core.device.utils import device_provisioned
-from kolibri.core.device.utils import get_device_setting
-from kolibri.core.device.utils import is_full_facility_import
-from kolibri.core.device.utils import set_device_settings
-from kolibri.core.errors import KolibriValidationError
-from kolibri.core.fields import DateTimeTzField
-from kolibri.core.fields import JSONField
-from kolibri.core.utils.model_router import KolibriModelRouter
-from kolibri.core.utils.validators import JSON_Schema_Validator
-from kolibri.deployment.default.sqlite_db_names import SESSIONS
-from kolibri.utils.time_utils import local_now
 
 from .constants import collection_kinds
 from .constants import facility_presets
@@ -89,6 +64,29 @@ from .permissions.base import RoleBasedPermissions
 from .permissions.general import IsAdminForOwnFacility
 from .permissions.general import IsOwn
 from .permissions.general import IsSelf
+from kolibri.core import error_constants
+from kolibri.core.auth.constants.demographics import choices as GENDER_CHOICES
+from kolibri.core.auth.constants.demographics import custom_demographics_schema
+from kolibri.core.auth.constants.demographics import DEFERRED
+from kolibri.core.auth.constants.demographics import DescriptionTranslationValidator
+from kolibri.core.auth.constants.demographics import EnumValuesValidator
+from kolibri.core.auth.constants.demographics import FacilityUserDemographicValidator
+from kolibri.core.auth.constants.demographics import LabelTranslationValidator
+from kolibri.core.auth.constants.demographics import NOT_SPECIFIED
+from kolibri.core.auth.constants.demographics import UniqueIdsValidator
+from kolibri.core.auth.constants.morango_sync import ScopeDefinitions
+from kolibri.core.device.hooks import GetOSUserHook
+from kolibri.core.device.utils import device_provisioned
+from kolibri.core.device.utils import get_device_setting
+from kolibri.core.device.utils import is_full_facility_import
+from kolibri.core.device.utils import set_device_settings
+from kolibri.core.errors import KolibriValidationError
+from kolibri.core.fields import DateTimeTzField
+from kolibri.core.fields import JSONField
+from kolibri.core.utils.model_router import KolibriModelRouter
+from kolibri.core.utils.validators import JSON_Schema_Validator
+from kolibri.deployment.default.sqlite_db_names import SESSIONS
+from kolibri.utils.time_utils import local_now
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +192,7 @@ def _has_permissions_class(obj):
 
 
 class FacilityDataSyncableModel(SyncableModel):
+
     morango_profile = morango_sync.PROFILE_FACILITY_DATA
 
     class Meta:
@@ -233,6 +232,7 @@ class FacilityDataset(FacilityDataSyncableModel):
     learner_can_login_with_no_password = models.BooleanField(default=False)
     show_download_button_in_learn = models.BooleanField(default=True)
     enable_mark_attendance = models.BooleanField(default=False)
+    enable_qr_login = models.BooleanField(default=True)
     picture_password_settings = JSONField(
         null=True,
         blank=True,
@@ -397,40 +397,6 @@ class AbstractFacilityDataModel(FacilityDataSyncableModel):
             self.ensure_dataset()
         except KolibriValidationError as e:
             raise IntegrityError(str(e))
-
-    def enforce_authoring_user_field(self, field_name, **save_kwargs):
-        """
-        Enforce and sanitize an "authoring" foreign key to a ``FacilityUser`` -- e.g.
-        ``creator``, ``created_by``, ``assigned_by`` or ``activated_by``.
-
-        Null is rejected only on local creation (``_state.adding``). Updates preserve
-        the existing author and deserialization may carry a null (e.g. the author's
-        ``FacilityUser`` has not synced to this device); both leave a null untouched.
-        Morango signals deserialization by passing ``update_dirty_bit_to=False``.
-
-        A cross-dataset superuser reference -- the device's own super admin authoring
-        content in a synced-in facility -- is dropped to keep the record syncable; any
-        other cross-dataset user is rejected.
-
-        The field must be ``blank=True, null=True`` so ``clean_fields`` accepts the
-        nulled value during deserialization.
-        """
-        user = getattr(self, field_name)
-        is_deserialization = save_kwargs.get("update_dirty_bit_to") is False
-        if self._state.adding and not is_deserialization and user is None:
-            raise IntegrityError(
-                "{model}.{field} may not be null".format(
-                    model=type(self).__name__, field=field_name
-                )
-            )
-        if user and user.dataset_id != self.dataset_id:
-            if not user.is_superuser:
-                raise IntegrityError(
-                    "{model}.{field} must belong to the same dataset".format(
-                        model=type(self).__name__, field=field_name
-                    )
-                )
-            setattr(self, field_name, None)
 
     def save(self, *args, **kwargs):
         self.pre_save(**kwargs)
@@ -783,6 +749,7 @@ class BaseFacilityUserModelManager(SyncableModelManager, UserManager):
         return user
 
     def create_superuser(self, username, password, facility=None, full_name=None):
+
         # import here to avoid circularity
         from kolibri.core.device.models import DevicePermissions
 
@@ -980,6 +947,24 @@ class FacilityUser(AbstractBaseUser, KolibriBaseUserMixin, AbstractFacilityDataM
     picture_password = models.CharField(
         max_length=8, null=True, blank=True, default=None
     )
+
+    # This field is used when QR code login for learners is enabled. It stores a random
+    # bearer token (generated by `secrets.token_urlsafe`) that is encoded into the QR code
+    # printed on the learner's credential card. The token is only applicable to learners
+    # (coach and admin users never have this field set) and is globally unique so a single
+    # token resolves to exactly one user. Like `picture_password`, it is intentionally
+    # stored as plaintext so coaches can read it back when reprinting cards, and so that
+    # revocation is simply "rotate the token".
+    qr_login_token = models.CharField(
+        max_length=64, null=True, blank=True, default=None, unique=True
+    )
+
+    # Stores a base64 data URL (e.g. "data:image/jpeg;base64,...") of the
+    # learner's profile photo for display on ID cards. Client-side canvas
+    # resizing keeps payloads to ~20-30 KB. Stored as plaintext TextField
+    # rather than ImageField because Kolibri has minimal media-serving
+    # infrastructure, and a data URL renders directly in <img src="...">.
+    profile_image = models.TextField(null=True, blank=True, default=None)
 
     class Meta:
         unique_together = (("dataset", "picture_password"),)
@@ -1626,6 +1611,9 @@ class Role(AbstractFacilityDataModel):
             if self.user.picture_password is not None:
                 self.user.picture_password = None
                 self.user.save(update_fields=["picture_password"])
+            if self.user.qr_login_token is not None:
+                self.user.qr_login_token = None
+                self.user.save(update_fields=["qr_login_token"])
         return result
 
     def delete(self, **kwargs):
@@ -1644,7 +1632,7 @@ class Role(AbstractFacilityDataModel):
                 ).delete()
             result = super().delete(**kwargs)
             user = self.user
-            user.refresh_from_db(fields=["picture_password"])
+            user.refresh_from_db(fields=["picture_password", "qr_login_token"])
             if (
                 user.picture_password is None
                 and not user.roles.exists()
@@ -1659,6 +1647,15 @@ class Role(AbstractFacilityDataModel):
                         assign_picture_password(user, user.facility)
                     except NoAvailableSequences:
                         pass
+            if (
+                user.qr_login_token is None
+                and not user.roles.exists()
+                and user.dataset.enable_qr_login
+            ):
+                # Deferred to avoid circular import: qr_tokens.py imports from models.py
+                from .utils.qr_tokens import assign_qr_login_token
+
+                assign_qr_login_token(user)
             return result
 
 
@@ -1668,6 +1665,7 @@ class CollectionProxyManager(SyncableModelManager):
 
 
 class Facility(Collection):
+
     # don't require that we have a dataset set during validation, so we're not forced to generate one unnecessarily
     FIELDS_TO_EXCLUDE_FROM_VALIDATION = ["dataset"]
 
@@ -1792,6 +1790,7 @@ class Facility(Collection):
 
 
 class Classroom(Collection):
+
     morango_model_name = "classroom"
     morango_model_dependencies = (Facility,)
     _KIND = collection_kinds.CLASSROOM
@@ -1862,6 +1861,7 @@ class Classroom(Collection):
 
 
 class LearnerGroup(Collection):
+
     morango_model_name = "learnergroup"
     morango_model_dependencies = (Classroom,)
     _KIND = collection_kinds.LEARNERGROUP
