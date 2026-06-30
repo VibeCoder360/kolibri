@@ -95,7 +95,6 @@
         });
       },
       /**
-       * Triggers a CSV download of the difficult questions data currently displayed in the table.
        * @public
        */
       exportCSV() {

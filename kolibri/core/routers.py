@@ -2,7 +2,6 @@
 Custom router to allow bulk deletion
 Modified from https://github.com/miki725/django-rest-framework-bulk
 """
-
 import copy
 
 from rest_framework.routers import DefaultRouter

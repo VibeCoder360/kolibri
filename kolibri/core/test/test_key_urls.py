@@ -1,4 +1,3 @@
-import requests
 from django.conf import settings
 from django.urls import reverse
 from django.urls.exceptions import NoReverseMatch
@@ -13,20 +12,6 @@ from kolibri.core.auth.test.test_api import DUMMY_PASSWORD
 from kolibri.core.auth.test.test_api import FacilityFactory
 from kolibri.core.auth.test.test_api import FacilityUserFactory
 from kolibri.core.device.translation import get_settings_language
-from kolibri.core.discovery.test.helpers import mock_response
-
-
-def mock_external_request(session, method, url, *args, **kwargs):
-    """
-    Give any outbound HTTP request a successful empty response, so that views
-    proxying to external services (the Kolibri Data Portal token validation,
-    the Studio remote channel lookup) can be smoke tested without depending
-    on those services.
-    """
-    response = mock_response(200)
-    response.url = url
-    response.json.return_value = []
-    return response
 
 
 class BeforeDeviceProvisionTests(APITestCase):
@@ -152,6 +137,7 @@ class KolibriTagNavigationTestCase(APITestCase):
 
 
 class AllUrlsTest(APITestCase):
+
     databases = "__all__"
 
     # Allow codes that may indicate a poorly formed response
@@ -161,7 +147,7 @@ class AllUrlsTest(APITestCase):
     def setUp(self):
         provision_device()
 
-    def check_responses(self, credentials=None):  # noqa: C901
+    def check_responses(self, credentials=None):  # noqa max-complexity=12
         r"""
         This is a very liberal test, we are mostly just concerned with making sure
         that no pages throw errors (500).
@@ -188,7 +174,7 @@ class AllUrlsTest(APITestCase):
         if not credentials:
             credentials = {}
 
-        def check_urls(urlpatterns, prefix=""):  # noqa: C901
+        def check_urls(urlpatterns, prefix=""):
             failures = []
             if credentials:
                 self.client.login(**credentials)
@@ -230,9 +216,7 @@ class AllUrlsTest(APITestCase):
 
         with patch(
             "kolibri.core.webpack.hooks.WebpackBundleHook.bundle", return_value=[]
-        ), patch(
-            "kolibri.core.webpack.hooks.WebpackBundleHook.get_by_unique_id"
-        ), patch.object(requests.Session, "request", mock_external_request):
+        ), patch("kolibri.core.webpack.hooks.WebpackBundleHook.get_by_unique_id"):
             from kolibri.deployment.default.urls import urlpatterns
 
             check_urls(urlpatterns)

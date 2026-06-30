@@ -1,3 +1,1 @@
-# Bundled runtime dependencies are resolved from the `base` dependency group in
-# pyproject.toml by `make staticdeps`. This file exists only as the sink for any
-# EXTRA_REQUIREMENTS injected at build time by build_tools/customize_requirements.py.
+-r requirements/base.txt

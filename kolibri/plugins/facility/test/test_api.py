@@ -2,7 +2,6 @@
 Tests that ensure the correct items are returned from api calls.
 Also tests whether the users with permissions can create logs.
 """
-
 import datetime
 import uuid
 

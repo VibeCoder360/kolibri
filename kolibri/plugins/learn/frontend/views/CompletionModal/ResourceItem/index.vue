@@ -72,7 +72,7 @@
         required: true,
       },
       /**
-       * Vue-router link object
+       * vue-router link object
        * The whole component behaves like
        * a link when provided.
        */

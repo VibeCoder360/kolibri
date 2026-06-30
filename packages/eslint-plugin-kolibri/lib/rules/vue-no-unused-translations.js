@@ -1,5 +1,5 @@
 /**
- * @file Disallow unused translation string definitions.
+ * @fileoverview Disallow unused translation string definitions.
  */
 
 'use strict';

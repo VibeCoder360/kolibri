@@ -3,6 +3,7 @@ from django.db import models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("content", "0042_remove_modality"),
     ]

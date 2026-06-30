@@ -5,6 +5,7 @@ import kolibri.core.auth.models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("kolibriauth", "0029_alter_facilityuser_managers"),
     ]

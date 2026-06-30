@@ -8,7 +8,6 @@
       <KIcon icon="search" />
     </UiIcon>
 
-    <!-- eslint-disable vuejs-accessibility/no-autofocus -- intentional: a11y autofocus -->
     <input
       ref="searchinput"
       v-model.trim="model"
@@ -24,7 +23,6 @@
       :aria-controls="ariaControls"
       @keyup="throttledEmitInput($event.target.value)"
     >
-    <!-- eslint-enable vuejs-accessibility/no-autofocus -->
 
     <KIconButton
       size="small"
@@ -62,14 +60,14 @@
         default: null,
       },
       /**
-       * Placeholder text shown when the input is empty.
+       * Placeholder
        */
       placeholder: {
         type: String,
         required: true,
       },
       /**
-       * Whether the input should grab keyboard focus on mount.
+       * Whether to autofocus
        */
       autofocus: {
         type: Boolean,
@@ -137,7 +135,6 @@
         this.$refs.searchinput.focus();
       },
       /**
-       * Move keyboard focus into the search input.
        * @public
        */
       focus() {

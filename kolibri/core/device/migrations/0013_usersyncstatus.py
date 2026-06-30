@@ -6,6 +6,7 @@ from django.db import models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("morango", "0016_store_deserialization_error"),
         ("kolibriauth", "0001_initial"),

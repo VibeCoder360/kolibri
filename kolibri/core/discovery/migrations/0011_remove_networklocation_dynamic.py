@@ -3,6 +3,7 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("discovery", "0010_set_location_type"),
     ]

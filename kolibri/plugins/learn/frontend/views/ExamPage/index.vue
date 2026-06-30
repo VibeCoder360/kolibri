@@ -122,7 +122,7 @@
                 />
               </KPageContainer>
             </div>
-            <KPageContainer style="min-height: 45vh; overflow-x: visible">
+            <KPageContainer style="overflow-x: visible">
               <KSelect
                 v-if="windowIsSmall || windowIsMedium"
                 style="margin-top: 1em"

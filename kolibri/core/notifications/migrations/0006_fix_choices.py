@@ -4,6 +4,7 @@ from django.db import models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("notifications", "0005_learnerprogressnotification_assignment_collections"),
     ]

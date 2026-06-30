@@ -1,4 +1,4 @@
-const path = require('node:path');
+const path = require('path');
 const _ = require('lodash');
 const webpackConfigPlugin = require('../webpack.config.plugin');
 

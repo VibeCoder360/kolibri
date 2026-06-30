@@ -15,6 +15,7 @@ logging = logger.getLogger(__name__)
 
 class AsyncNotificationQueue:
     def __init__(self):
+
         # Value in seconds to determine the sleep time between log saving batches
         self.log_saving_interval = 5
 

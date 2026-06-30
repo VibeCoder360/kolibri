@@ -1,13 +1,13 @@
 from django.db import models
 
+from .constants import nutrition_endpoints
 from kolibri.core.auth.models import FacilityUser
 from kolibri.core.auth.permissions.general import IsOwn
 from kolibri.core.fields import JSONField
 
-from .constants import nutrition_endpoints
-
 
 class PingbackNotification(models.Model):
+
     id = models.CharField(max_length=50, primary_key=True)
     version_range = models.CharField(max_length=50)
     timestamp = models.DateField()
@@ -18,6 +18,7 @@ class PingbackNotification(models.Model):
 
 
 class PingbackNotificationDismissed(models.Model):
+
     permissions = IsOwn()
 
     user = models.ForeignKey(FacilityUser, on_delete=models.CASCADE)

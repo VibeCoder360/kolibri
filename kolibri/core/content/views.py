@@ -4,9 +4,8 @@ from django.http import Http404
 from django.http import HttpResponseRedirect
 from django.views.generic.base import View
 
-from kolibri.core.content.hooks import ContentNodeDisplayHook
-
 from .models import ContentNode
+from kolibri.core.content.hooks import ContentNodeDisplayHook
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +50,7 @@ def get_by_content_id(content_id):
 
 class ContentPermalinkRedirect(View):
     def get(self, request, *args, **kwargs):
+
         # extract the GET parameters
         channel_id = request.GET.get("channel_id")
         node_id = request.GET.get("node_id")

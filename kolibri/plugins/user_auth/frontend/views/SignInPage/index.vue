@@ -143,11 +143,11 @@
   import { validateUsername } from 'kolibri/utils/validators';
   import { LoginErrors } from 'kolibri/constants';
   import commonCoreStrings from 'kolibri/uiText/commonCoreStrings';
+  import FacilityUsernameResource from 'kolibri-common/apiResources/FacilityUsernameResource';
   import { useRoute, useRouter } from 'vue-router/composables';
   import { computed } from 'vue';
   import { useFacilitySelect } from 'kolibri-common/composables/useFacility';
-  import FacilityUsernameResource from '../../apiResources/FacilityUsernameResource';
-  import { ComponentMap, MAX_USERS_FOR_LISTING_VIEW } from '../../constants';
+  import { ComponentMap } from '../../constants';
   import AuthBase from '../AuthBase';
   import UsersList from '../UsersList';
   import commonUserStrings from '../commonUserStrings';
@@ -156,6 +156,8 @@
   import useAuthRouter from '../../composables/useAuthRouter';
   import AuthContextHeading from '../AuthContextHeading.vue';
   import SignInHeading from './SignInHeading';
+
+  const MAX_USERS_FOR_LISTING_VIEW = 16;
 
   export default {
     name: 'SignInPage',
@@ -250,7 +252,7 @@
         return this.facilityConfig.learner_can_login_with_no_password;
       },
       showUsersList() {
-        return this.usernamesForCurrentFacility.length > 0 && this.isAppContext;
+        return this.selectedFacility.num_users <= MAX_USERS_FOR_LISTING_VIEW && this.isAppContext;
       },
       suggestions() {
         // Filter suggestions on the client side so we don't hammer the server
@@ -313,19 +315,15 @@
       },
     },
     created() {
-      if (this.isAppContext) {
+      // Only fetch if we should fetch for this facility
+      if (this.showUsersList) {
         FacilityUsernameResource.fetchCollection({
           getParams: {
             facility: this.selectedFacility.id,
-            max_results: MAX_USERS_FOR_LISTING_VIEW,
           },
-        })
-          .then(data => {
-            if (!data.more) {
-              this.usernamesForCurrentFacility = data.results.map(u => u.username);
-            }
-          })
-          .catch(() => {});
+        }).then(data => {
+          this.usernamesForCurrentFacility = data.map(u => u.username);
+        });
       }
     },
     methods: {
@@ -377,7 +375,7 @@
           },
         })
           .then(users => {
-            this.usernameSuggestions = users.results.map(user => user.username);
+            this.usernameSuggestions = users.map(user => user.username);
             this.showDropdown = true;
           })
           .catch(() => {

@@ -1,7 +1,7 @@
 from rest_framework import routers
 
-from .viewsets.setup_wizard import FacilityImportViewSet
-from .viewsets.setup_wizard import SetupWizardResource
+from .api import FacilityImportViewSet
+from .api import SetupWizardResource
 
 router = routers.SimpleRouter()
 

@@ -26,6 +26,7 @@ def revert_location_type(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("discovery", "0009_add_location_type"),
     ]

@@ -36,6 +36,7 @@ def migrate_collection_ids(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("notifications", "0004_learnerprogressnotification_quiz_num_answered")
     ]

@@ -39,7 +39,6 @@
         :style="{ backgroundColor: $themePalette.grey.v_200 }"
         frameBorder="0"
         :src="rooturl"
-        :title="$tr('contentFrameTitle')"
         allow="fullscreen"
       >
       </iframe>
@@ -208,10 +207,6 @@
         message: 'Enter fullscreen',
         context:
           'Learners can use the full screen button in the upper right corner to open an html5 app in fullscreen view.\n',
-      },
-      contentFrameTitle: {
-        message: 'Content viewer',
-        context: 'Accessible title for the iframe that displays the content',
       },
     },
   };

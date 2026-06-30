@@ -13,6 +13,7 @@ from kolibri.core.content.zip_wsgi import generate_zip_content_response
 from kolibri.core.content.zip_wsgi import INITIALIZE_SANDBOX_FROM_IFRAME
 from kolibri.utils.tests.helpers import override_option
 
+
 sandbox_injection = '<script type="text/javascript">{}</script>'.format(
     INITIALIZE_SANDBOX_FROM_IFRAME
 )
@@ -55,6 +56,7 @@ class ZipContentTestCase(TestCase):
     embedded_file_str = "Embedded file test"
 
     def setUp(self):
+
         self.hash = hashlib.md5("DUMMYDATA".encode()).hexdigest()
         self.extension = "zip"
         self.filename = "{}.{}".format(self.hash, self.extension)
@@ -364,8 +366,7 @@ class ZipContentTestCase(TestCase):
     def test_options_request_accept_ranges_binary(self):
         """Test OPTIONS request for non-HTML file returns Accept-Ranges: bytes"""
         response = self._get_file(
-            self.test_name_1,
-            REQUEST_METHOD="OPTIONS",  # This is a .txt file
+            self.test_name_1, REQUEST_METHOD="OPTIONS"  # This is a .txt file
         )
         self.assertEqual(response.headers["Accept-Ranges"], "bytes")
         self.assertEqual(response.status_code, 200)

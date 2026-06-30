@@ -3,10 +3,8 @@ import store from 'kolibri/store';
 import videojs from 'video.js';
 
 /**
- * Produce a video.js component class that renders a Vue component as its DOM element.
- * @param {string} videojsComponent - A string of the videojs component to extend
- * @param {object} vueComponent - A compiled vue component object
- * @returns {Function} Subclass of the named video.js component backed by the Vue component
+ * @param {String} videojsComponent A string of the videojs component to extend
+ * @param {Object} vueComponent A compiled vue component object
  */
 export default function videojsVueMixin(videojsComponent, vueComponent) {
   const VideojsComponent = videojs.getComponent(videojsComponent);
@@ -16,16 +14,16 @@ export default function videojsVueMixin(videojsComponent, vueComponent) {
     /**
      * This is called by video.js code that usually constructs an element, but here we'll leverage
      * vue by calling it manually.
-     * @returns {Element} Root DOM element from the mounted Vue component
+     *
+     * @return {Element}
      */
     createEl() {
       return this.createVueComponent().$el;
     }
 
     /**
-     * Destroy any existing Vue instance and mount a fresh one, storing it on the component.
-     * @param {object} [options] - Extra options forwarded to the Vue component constructor
-     * @returns {VueComponent} The freshly mounted Vue component
+     * @param {Object} [options]
+     * @return {VueComponent}
      */
     createVueComponent(options) {
       this.clearVueComponent();
@@ -34,8 +32,7 @@ export default function videojsVueMixin(videojsComponent, vueComponent) {
     }
 
     /**
-     * Return the currently mounted Vue component, if any.
-     * @returns {VueComponent} The currently held Vue component, or undefined if none is mounted
+     * @return {VueComponent}
      */
     getVueComponent() {
       return this._vueComponent;

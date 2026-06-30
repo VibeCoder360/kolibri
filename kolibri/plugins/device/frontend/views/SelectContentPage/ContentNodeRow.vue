@@ -19,7 +19,6 @@
             v-if="isCourse"
             icon="course"
             style="top: 4px"
-            data-testid="icon-course"
           />
           <ContentIcon
             v-else

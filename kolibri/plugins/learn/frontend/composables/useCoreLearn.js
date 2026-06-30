@@ -4,8 +4,6 @@ import client from 'kolibri/client';
 import urls from 'kolibri/urls';
 import plugin_data from 'kolibri-plugin-data';
 
-/** @typedef {import('vue').Ref} Ref */
-
 /**
  * Whether the user is in any classes
  * @type {Ref<boolean>}
@@ -32,11 +30,9 @@ export function prepareLearnApp() {
 }
 
 /**
- * Returns the learn-app's reactive state flags for classroom membership and download
- * permissions.
- * @returns {{
+ * @return {{
  *   canDownloadExternally: Ref<boolean>, canAddDownloads: Ref<boolean>, inClasses: Ref<boolean>
- * }} Reactive learn-app state.
+ * }}
  */
 export default function useCoreLearn() {
   return {

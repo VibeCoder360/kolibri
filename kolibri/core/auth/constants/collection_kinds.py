@@ -2,6 +2,7 @@
 This module contains constants representing the kinds of Collections.
 """
 
+
 FACILITY = "facility"
 CLASSROOM = "classroom"
 LEARNERGROUP = "learnergroup"

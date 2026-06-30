@@ -3,8 +3,8 @@ import captionsMenu from './CaptionsMenu.vue';
 
 class CaptionsMenu extends mixin(captionsMenu) {
   /**
-   * Reset focus child to first item.
-   * @param {boolean} [lock] - When true, lock the menu open.
+   * Reset focus child to first item
+   * @param {Boolean} lock
    */
   doShow(lock = false) {
     this.focusedChild_ = 0;

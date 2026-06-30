@@ -1,4 +1,15 @@
 export default (widget, rubric) => {
-  // Interactive graph scoring checks the graph state object (coords, center, radius, etc.)
-  widget.props.handleUserInput(rubric.correct);
+  const graph = rubric.correct;
+
+  widget.props.onChange(
+    {
+      graph,
+    },
+    // When the props have finished updating, then use the resetGraphie method to make
+    // the graph render with the new answer.
+    () => {
+      widget.resetGraphie();
+    },
+    false, // silent
+  );
 };

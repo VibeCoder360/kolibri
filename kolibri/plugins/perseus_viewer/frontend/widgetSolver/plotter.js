@@ -1,4 +1,9 @@
 export default (widget, rubric) => {
-  // Plotter scoring does deep comparison of userInput against rubric.correct
-  widget.props.handleUserInput(rubric.correct);
+  widget.setState(
+    {
+      values: rubric.correct,
+    },
+    // Add callback to rerender Graphie after setting the state
+    widget.componentDidMount,
+  );
 };

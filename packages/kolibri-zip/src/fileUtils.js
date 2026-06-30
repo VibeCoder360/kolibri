@@ -12,6 +12,7 @@ try {
 /**
  * Resolve a relative file path against a base file path within a ZIP archive.
  * Uses URL resolution to handle '../' and './' segments.
+ *
  * @param {string} baseFilePath - Path of the referencing file (e.g. 'css/style.css')
  * @param {string} relativeFilePath - Relative path to resolve (e.g. '../images/icon.png')
  * @returns {string|null} Absolute path within the ZIP, or null if resolution fails
@@ -38,7 +39,6 @@ export function getAbsoluteFilePath(baseFilePath, relativeFilePath) {
  */
 export class Mapper {
   /**
-   * Construct a mapper for the given extracted file.
    * @param {import('./index').ExtractedFile} file - The extracted file to process
    */
   constructor(file) {
@@ -47,8 +47,9 @@ export class Mapper {
 
   /**
    * Extract all referenced file paths from the file content.
-   * @abstract
+   *
    * @returns {string[]} Array of relative file paths found in the content
+   * @abstract
    */
   getPaths() {
     throw new Error('Not implemented');
@@ -56,8 +57,10 @@ export class Mapper {
 
   /**
    * Replace file references in the content with resolved URLs.
-   * @abstract
+   *
+   * @param {Object<string, string>} packageFiles - Map of original relative path to replacement URL
    * @returns {string} File content with paths replaced
+   * @abstract
    */
   replacePaths() {
     throw new Error('Not implemented');
@@ -76,11 +79,8 @@ const cssPathRegexLegacy =
 
 const unescapePathRegex = /\\(.)/g;
 
-/**
- * Remove backslash escapes from a CSS string value.
- * @param {string} str - CSS string with backslash escapes
- * @returns {string} Unescaped string
- */
+/** @param {string} str - CSS string with backslash escapes
+ *  @returns {string} Unescaped string */
 function unescapeCssString(str) {
   return str.replace(unescapePathRegex, '$1');
 }
@@ -119,7 +119,7 @@ function getCSSPathsLegacy(fileContents) {
 /**
  * Replace file paths in CSS content using lookbehind regex (modern browsers).
  * @param {string} fileContents - CSS file content
- * @param {{[key: string]: string}} packageFiles - Map of original path to replacement URL
+ * @param {Object<string, string>} packageFiles - Map of original path to replacement URL
  * @returns {string} CSS content with paths replaced
  */
 function replaceCSSPathsModern(fileContents, packageFiles) {
@@ -147,7 +147,7 @@ function replaceCSSPathsModern(fileContents, packageFiles) {
 /**
  * Replace file paths in CSS content without lookbehind (legacy browsers).
  * @param {string} fileContents - CSS file content
- * @param {{[key: string]: string}} packageFiles - Map of original path to replacement URL
+ * @param {Object<string, string>} packageFiles - Map of original path to replacement URL
  * @returns {string} CSS content with paths replaced
  */
 function replaceCSSPathsLegacy(fileContents, packageFiles) {
@@ -219,6 +219,7 @@ const queryParamRegex = /([^?)]+)?(\?.*)/g;
  * Extract all referenced file paths from HTML/XML content.
  * Finds paths in src, href, srcset attributes, inline style attributes,
  * and `<style>` block contents.
+ *
  * @param {string} fileContents - HTML/XML file content
  * @param {string} mimeType - MIME type for DOMParser (e.g. 'text/html', 'application/xml')
  * @returns {string[]} Array of referenced file paths
@@ -262,8 +263,9 @@ export function getDOMPaths(fileContents, mimeType) {
 
 /**
  * Replace URLs in an HTML srcset attribute value.
+ *
  * @param {string} srcset - srcset attribute value (e.g. 'img.jpg 1x, img2.jpg 2x')
- * @param {{[key: string]: string}} packageFiles - Map of original path to replacement URL
+ * @param {Object<string, string>} packageFiles - Map of original path to replacement URL
  * @returns {string} srcset value with paths replaced
  */
 function replaceSrcsetUrls(srcset, packageFiles) {
@@ -293,8 +295,9 @@ function replaceSrcsetUrls(srcset, packageFiles) {
  * Replace file references in HTML/XML content with resolved URLs.
  * Handles src, href, srcset attributes, inline style attributes,
  * and `<style>` block contents.
+ *
  * @param {string} fileContents - HTML/XML file content
- * @param {{[key: string]: string}} packageFiles - Map of original path to replacement URL
+ * @param {Object<string, string>} packageFiles - Map of original path to replacement URL
  * @param {string} mimeType - MIME type for DOMParser (e.g. 'text/html', 'application/xml')
  * @returns {string} Content with file references replaced
  */

@@ -4,6 +4,7 @@ from django.db import models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("kolibriauth", "0011_facilitydataset_show_download_button_in_learn")
     ]

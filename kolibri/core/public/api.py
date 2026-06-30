@@ -27,6 +27,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .. import error_constants
 from kolibri.core.api import BaseValuesViewset
 from kolibri.core.api import ReadOnlyValuesViewset
 from kolibri.core.auth.middleware import session_exempt
@@ -53,8 +54,6 @@ from kolibri.core.public.constants.user_sync_options import HANDSHAKING_TIME
 from kolibri.core.public.constants.user_sync_options import MAX_CONCURRENT_SYNCS
 from kolibri.core.serializers import HexOnlyUUIDField
 from kolibri.utils.conf import OPTIONS
-
-from .. import error_constants
 
 
 class InfoViewSet(viewsets.ViewSet):
@@ -151,7 +150,7 @@ class PublicContentNodeTreeViewSet(BaseContentNodeTreeViewset):
 
 @api_view(["GET"])
 def get_public_channel_list(request, version):
-    """Endpoint: /public/<version>/channels/?=<query params>"""
+    """ Endpoint: /public/<version>/channels/?=<query params> """
     try:
         channel_list = _get_channel_list(version, request.query_params)
     except LookupError:
@@ -167,7 +166,7 @@ def get_public_channel_list(request, version):
 
 @api_view(["GET"])
 def get_public_channel_lookup(request, version, identifier):
-    """Endpoint: /public/<version>/channels/lookup/<identifier>"""
+    """ Endpoint: /public/<version>/channels/lookup/<identifier> """
     try:
         channel_list = _get_channel_list(
             version,
@@ -194,7 +193,7 @@ def get_public_channel_lookup(request, version, identifier):
 @csrf_exempt
 @gzip_page
 def get_public_file_checksums(request, version):
-    """Endpoint: /public/<version>/file_checksums/"""
+    """ Endpoint: /public/<version>/file_checksums/ """
     if version == "v1":
         if request.content_type == "application/json":
             data = request.body

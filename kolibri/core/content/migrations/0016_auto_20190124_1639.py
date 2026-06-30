@@ -11,6 +11,7 @@ def calculate_channel_order(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+
     dependencies = [("content", "0015_auto_20190125_1715")]
 
     operations = [

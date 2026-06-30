@@ -50,6 +50,7 @@ from kolibri.core.logger.models import GenerateCSVLogRequest
 from kolibri.core.logger.models import MasteryLog
 from kolibri.core.logger.models import UserSessionLog
 
+
 logger = logging.getLogger(__name__)
 
 

@@ -4,7 +4,6 @@
   <div
     :class="{ 'base-container': true, 'window-is-small': windowIsSmall }"
     :style="{ 'background-color': windowIsSmall ? $themeTokens.surface : '' }"
-    role="presentation"
     @keyup.enter="handleEnterKey"
   >
     <div class="logo-lang-container">

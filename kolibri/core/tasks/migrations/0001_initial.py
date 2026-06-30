@@ -8,6 +8,7 @@ from kolibri.core.tasks.operations import CreateModelIfNotExists
 
 
 class Migration(migrations.Migration):
+
     initial = True
 
     dependencies = []

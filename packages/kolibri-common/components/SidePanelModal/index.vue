@@ -2,8 +2,7 @@
 
   <div
     ref="sidePanel"
-    tabindex="-1"
-    role="presentation"
+    :tabindex="0"
     :class="{ 'is-rtl': isRtl, 'is-mobile': isMobile }"
     @keyup.esc="closePanel"
   >
@@ -14,9 +13,11 @@
       >
         <section
           class="side-panel"
+          role="region"
           :style="sidePanelStyles"
           :aria-label="ariaLabel"
         >
+          <!-- Fixed header -->
           <div
             ref="fixedHeader"
             :class="{
@@ -186,7 +187,7 @@
       responsiveWidth() {
         return this.isMobile ? '100vw' : this.sidePanelWidth;
       },
-      // Styling properties
+      /** Styling Properties */
       headerStyles() {
         return {
           backgroundColor: this.immersive ? this.$themeTokens.appBar : this.$themeTokens.surface,
@@ -241,8 +242,8 @@
         this.$el.querySelector('.close-button').focus();
       },
       /**
-       * Reset the next focus to the first focus element.
        * @public
+       * Reset the next focus to the first focus element
        */
       focusFirstEl() {
         this.$el.querySelector('.close-button').focus();

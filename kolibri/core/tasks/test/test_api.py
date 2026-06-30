@@ -26,6 +26,7 @@ from kolibri.core.tasks.registry import RegisteredTask
 from kolibri.core.tasks.registry import TaskRegistry
 from kolibri.core.tasks.validation import JobValidator
 
+
 DUMMY_PASSWORD = "password"
 
 fake_job_defaults = dict(
@@ -85,7 +86,7 @@ class BaseAPITestCase(APITestCase):
         )
 
 
-@patch("kolibri.core.tasks.viewsets.tasks.job_storage")
+@patch("kolibri.core.tasks.api.job_storage")
 class TaskAPITestCase(BaseAPITestCase):
     def setUp(self):
         self.client.login(username=self.superuser.username, password=DUMMY_PASSWORD)
@@ -110,7 +111,7 @@ class TaskAPITestCase(BaseAPITestCase):
         self.assertEqual(response.status_code, 404)
 
 
-@patch("kolibri.core.tasks.viewsets.tasks.job_storage")
+@patch("kolibri.core.tasks.api.job_storage")
 class CreateTaskAPITestCase(BaseAPITestCase):
     def setUp(self):
         self.client.login(username=self.superuser.username, password=DUMMY_PASSWORD)
@@ -590,7 +591,7 @@ class CreateTaskAPITestCase(BaseAPITestCase):
         mock_job_storage.get_job.assert_has_calls([call("test"), call("test")])
 
 
-@patch("kolibri.core.tasks.viewsets.tasks.job_storage")
+@patch("kolibri.core.tasks.api.job_storage")
 class EnqueueArgsCreateAPITestCase(BaseAPITestCase):
     @classmethod
     def setUpTestData(cls):
@@ -708,6 +709,7 @@ class EnqueueArgsCreateAPITestCase(BaseAPITestCase):
         mock_job_storage.get_orm_job.return_value = dummy_orm_job_data
 
         for enq_arg in acceptable_enqueue_args:
+
             response = self.client.post(
                 reverse("kolibri:core:task-list"),
                 {
@@ -854,7 +856,7 @@ class EnqueueArgsCreateAPITestCase(BaseAPITestCase):
         self.assertEqual(mock_job_storage.enqueue_in.call_args[1]["retry_interval"], 60)
 
 
-@patch("kolibri.core.tasks.viewsets.tasks.job_storage")
+@patch("kolibri.core.tasks.api.job_storage")
 class EnqueueArgsUpdateAPITestCase(BaseAPITestCase):
     @classmethod
     def setUpTestData(cls):
@@ -965,6 +967,7 @@ class EnqueueArgsUpdateAPITestCase(BaseAPITestCase):
         mock_job_storage.get_orm_job.return_value = dummy_orm_job_data
 
         for enq_arg in acceptable_enqueue_args:
+
             response = self.client.patch(
                 reverse("kolibri:core:task-detail", kwargs={"pk": "test-id"}),
                 {
@@ -1115,7 +1118,7 @@ class EnqueueArgsUpdateAPITestCase(BaseAPITestCase):
         self.assertEqual(response.status_code, 409)
 
 
-@patch("kolibri.core.tasks.viewsets.tasks.job_storage")
+@patch("kolibri.core.tasks.api.job_storage")
 class ListAPIRepeat(BaseAPITestCase):
     @classmethod
     def setUpTestData(cls):
@@ -1167,7 +1170,7 @@ class ListAPIRepeat(BaseAPITestCase):
         )
 
 
-@patch("kolibri.core.tasks.viewsets.tasks.job_storage")
+@patch("kolibri.core.tasks.api.job_storage")
 class TaskManagementAPITestCase(BaseAPITestCase):
     def setUp(self):
         @register_task(permission_classes=[IsSuperAdmin], queue="kolibri")
@@ -1461,7 +1464,7 @@ class TaskManagementAPITestCase(BaseAPITestCase):
         self.assertEqual(response.status_code, 403)
 
 
-@patch("kolibri.core.tasks.viewsets.tasks.job_storage")
+@patch("kolibri.core.tasks.api.job_storage")
 class TaskAPIPermissionsTestCase(APITestCase):
     databases = "__all__"
 

@@ -15,7 +15,6 @@ This module should be easier to document, for instance by having VARIABLES
 instead of a dict.
 
 """
-
 import logging
 import os
 

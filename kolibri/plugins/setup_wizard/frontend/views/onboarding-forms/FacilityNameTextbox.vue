@@ -52,7 +52,6 @@
         this.fieldVisited = true;
       },
       /**
-       * Moves keyboard focus to the facility name input field.
        * @public
        */
       focus() {

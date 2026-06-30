@@ -10,6 +10,9 @@ from django.test import override_settings
 from django.test import TestCase
 from django.utils import timezone
 
+from ..management.commands import bulkimportusers as b
+from ..management.commands.bulkexportusers import labels
+from .helpers import create_dummy_facility_data
 from kolibri.core.auth.constants import demographics
 from kolibri.core.auth.constants import role_kinds
 from kolibri.core.auth.models import Classroom
@@ -17,9 +20,6 @@ from kolibri.core.auth.models import FacilityUser
 from kolibri.core.utils.csv import open_csv_for_reading
 from kolibri.core.utils.csv import open_csv_for_writing
 
-from ..management.commands import bulkimportusers as b
-from ..management.commands.bulkexportusers import labels
-from .helpers import create_dummy_facility_data
 
 CLASSROOMS = 2
 
@@ -235,7 +235,7 @@ class ImportTestCase(TestCase):
         assert len(per_line_errors) == 1
         assert (
             per_line_errors[0]["message"]
-            == "The password field is required. To leave the password unchanged in existing users, insert an asterisk (*)"
+            == "The password field is required. To leave the password unchanged in existing users, insert an asterisk (*)"  # noqa: W503
         )
         out_log = StringIO()
         call_command(

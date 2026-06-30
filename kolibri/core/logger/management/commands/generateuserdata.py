@@ -11,6 +11,7 @@ from kolibri.core.auth.test.helpers import provision_device
 from kolibri.core.content.models import ChannelMetadata
 from kolibri.core.logger.utils import user_data as utils
 
+
 logger = logging.getLogger(__name__)
 
 

@@ -6,9 +6,7 @@ import Settings from '../../utils/settings';
 const { handleSelectedLanguageChange } = videojs.getComponent('TextTrackMenuItem').prototype;
 
 /**
- * Build the default captions settings, seeded from the active Vue locale.
- * @returns {{captionLanguage: string, captionSubtitles: boolean, captionTranscript: boolean}}
- * The default captions settings object.
+ * @return {{captionLanguage: *, captionSubtitles: boolean, captionTranscript: boolean}}
  */
 const defaultSettings = () => ({
   captionLanguage: vue.locale,
@@ -17,18 +15,16 @@ const defaultSettings = () => ({
 });
 
 /**
- * Resolve the captions module's track list to a plain array.
- * @param {object} state - The captions module's Vuex state.
- * @returns {TextTrack[]} The configured text tracks, or an empty array when none.
+ * @param state
+ * @return {TextTrack[]}
  */
 const tracks = state => {
   return trackUtils.listToArray(state.trackList || []);
 };
 
 /**
- * Find the track matching the active captions language.
- * @param {object} state - The captions module's Vuex state.
- * @returns {?TextTrack} The matching track, or undefined when no track matches.
+ * @param state
+ * @return {TextTrack|null}
  */
 const languageTrack = state => {
   return tracks(state).find(track => state.language === track.language);
@@ -85,32 +81,28 @@ export default {
   },
   getters: {
     /**
-     * The display label for the track matching the active captions language.
-     * @param {object} state - The captions module's Vuex state.
-     * @returns {string} The matching track label, or empty string when none matches.
+     * @param state
+     * @return {string}
      */
     languageLabel(state) {
       const track = languageTrack(state);
       return track ? track.label : '';
     },
     /**
-     * Resolve the captions module's track list to a plain array.
-     * @param {object} state - The captions module's Vuex state.
-     * @returns {TextTrack[]} The configured text tracks.
+     * @param state
+     * @return {TextTrack[]}
      */
     tracks,
     /**
-     * Find the currently enabled text track.
-     * @param {object} state - The captions module's Vuex state.
-     * @returns {?TextTrack} The enabled track, or undefined when none is enabled.
+     * @param state
+     * @return {TextTrack}
      */
     activeTrack(state) {
       return tracks(state).find(track => trackUtils.isEnabled(track));
     },
     /**
-     * Find the track matching the active captions language.
-     * @param {object} state - The captions module's Vuex state.
-     * @returns {?TextTrack} The matching track, or undefined when no track matches.
+     * @param state
+     * @return {TextTrack|null}
      */
     languageTrack,
   },

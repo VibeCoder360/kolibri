@@ -2,7 +2,7 @@ from django.urls import include
 from django.urls import re_path
 from rest_framework import routers
 
-from .viewsets.exam import ExamViewset
+from .api import ExamViewset
 
 router = routers.SimpleRouter()
 router.register(r"exam", ExamViewset, basename="exam")

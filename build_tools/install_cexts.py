@@ -1,13 +1,11 @@
-# /// script
-# requires-python = ">=3.6"
-# dependencies = ["requests==2.27.1", "beautifulsoup4==4.8.2", "pip>=20"]
-# ///
 """
 This module defines functions to install c extensions for all the platforms into
 Kolibri.
 
+See requirements/build.txt for the list of requirements that must be installed for this
+script to run.
 Usage:
-> python build_tools/install_cexts.py --file "requirements/cext.txt" --cache-path ".cext_cache"
+> python build_tools/install_cexts.py --file "requirements/cext.txt" --cache-path "/cext_cache"
 
 It reads the package name and version from requirements/cext.txt file and
 installs the package and its dependencies using `pip install` with cache_path as
@@ -25,9 +23,7 @@ from Piwheels website for the builds on Buildkite. If the directory of the cache
 passed into the function is not writable, a folder named `cext_cache` will be
 created under the directory where the script runs to store the cache data.
 """
-
 import argparse
-import concurrent.futures
 import logging
 import os
 import shutil
@@ -93,8 +89,6 @@ def run_pip_install(
     """
     return_code = subprocess.call(
         [
-            sys.executable,
-            "-m",
             "pip",
             "install",
             "-q",
@@ -121,104 +115,52 @@ def run_pip_install(
     return return_code
 
 
-DEFAULT_MAX_WORKERS = 8
-
-
-def build_install_tasks(package_name, package_version, index_url, info, cache_path):
+def install_package(package_name, package_version, index_url, info, cache_path):
     """
-    Turn the parsed wheel infos for a package into install task descriptors.
-    Pure data transformation — does no I/O — so the tasks can be collected
-    across packages and indexes and then installed concurrently.
+    Install packages based on the information we gather from the index_url page
     """
-    tasks = []
     for item in info:
-        tasks.append(
-            {
-                "package_name": package_name,
-                "package_version": package_version,
-                "index_url": index_url,
-                "platform": item["platform"],
-                "implementation": item["implementation"],
-                "python_version": item["version"],
-                "abi": item["abi"],
-                "cache_path": cache_path,
-            }
+        platform = item["platform"]
+        implementation = item["implementation"]
+        python_version = item["version"]
+        abi = item["abi"]
+        filename = "-".join([package_name, package_version, abi, platform])
+
+        # Calculate the path that the package will be installed into
+        # Cryptography builds for Linux target Python 3.6+ but the only existing
+        # build is labeled 3.6 (the lowest version supported).
+        # So install abi3 packages into a separate folder to be used across all Python 3 versions.
+        # https://cryptography.io/en/latest/faq/#why-are-there-no-wheels-for-my-python3-x-version
+        version_path = os.path.join(
+            DIST_CEXT, abi if abi == "abi3" else implementation + python_version
         )
-    return tasks
+        package_path = get_path_with_arch(
+            platform, version_path, abi, implementation, python_version
+        )
 
+        logger.info("Installing package {}...".format(filename))
+        # Install the package using pip with cache_path as the cache directory
+        install_return = run_pip_install(
+            package_path,
+            platform,
+            python_version,
+            implementation,
+            abi,
+            package_name,
+            package_version,
+            index_url,
+            cache_path,
+        )
 
-def install_one(task):
-    """
-    Install a single wheel target. Raises RuntimeError on a fatal (PyPI)
-    failure; a tolerated (Piwheels) failure is ignored.
-    """
-    abi = task["abi"]
-    implementation = task["implementation"]
-    python_version = task["python_version"]
-    platform = task["platform"]
-    package_name = task["package_name"]
-    package_version = task["package_version"]
-    index_url = task["index_url"]
-    cache_path = task["cache_path"]
-
-    filename = "-".join([package_name, package_version, abi, platform])
-
-    # Calculate the path that the package will be installed into
-    # Cryptography builds for Linux target Python 3.6+ but the only existing
-    # build is labeled 3.6 (the lowest version supported).
-    # So install abi3 packages into a separate folder to be used across all Python 3 versions.
-    # https://cryptography.io/en/latest/faq/#why-are-there-no-wheels-for-my-python3-x-version
-    version_path = os.path.join(
-        DIST_CEXT, abi if abi == "abi3" else implementation + python_version
-    )
-    package_path = get_path_with_arch(
-        platform, version_path, abi, implementation, python_version
-    )
-
-    logger.info("Installing package {}...".format(filename))
-    # Install the package using pip with cache_path as the cache directory
-    install_return = run_pip_install(
-        package_path,
-        platform,
-        python_version,
-        implementation,
-        abi,
-        package_name,
-        package_version,
-        index_url,
-        cache_path,
-    )
-
-    if install_return == 1:
-        if index_url == PYPI_DOWNLOAD:
-            raise RuntimeError("Installation failed for package {}.".format(filename))
-        # Ignore Piwheels installation failure because the website is not always
-        # stable. Nothing was installed, so there is no dist-info to clean up.
-        return
-
-    # Clean up .dist-info folders
-    if os.path.isdir(package_path):
-        for folder in os.listdir(package_path):
-            if folder.endswith(".dist-info"):
-                shutil.rmtree(os.path.join(package_path, folder))
-
-
-def run_installs(tasks, max_workers=DEFAULT_MAX_WORKERS):
-    """
-    Install all collected wheel tasks concurrently. Each task is an independent,
-    network-bound `pip install` into its own target directory, so a thread pool
-    overlaps the downloads. A fatal (PyPI) failure aborts the build.
-    """
-    errors = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(install_one, task) for task in tasks]
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                future.result()
-            except RuntimeError as e:
-                errors.append(str(e))
-    if errors:
-        sys.exit("\n" + "\n".join(errors) + "\n")
+        # Ignore Piwheels installation failure because the website is not always stable
+        if install_return == 1 and index_url == PYPI_DOWNLOAD:
+            sys.exit("\nInstallation failed for package {}.\n".format(filename))
+        else:
+            # Clean up .dist-info folders
+            dist_info_folders = os.listdir(package_path)
+            for folder in dist_info_folders:
+                if folder.endswith(".dist-info"):
+                    shutil.rmtree(os.path.join(package_path, folder))
 
 
 supported_python3_versions = ["36", "37", "38", "39", "310", "311"]
@@ -235,7 +177,6 @@ def parse_package_page(files, pk_version, index_url, cache_path):
     """
 
     result = []
-    package_name = None
     for file in files.find_all("a"):
         # Skip if not a whl file
         if not file.string.endswith("whl"):
@@ -265,17 +206,13 @@ def parse_package_page(files, pk_version, index_url, cache_path):
         }
         result.append(info)
 
-    if package_name is None:
-        return []
-
-    return build_install_tasks(package_name, pk_version, index_url, result, cache_path)
+    install_package(package_name, pk_version, index_url, result, cache_path)
 
 
 def parse_pypi_and_piwheels(name, pk_version, cache_path, session):
     """
-    Collect the install tasks from the pypi and piwheels pages of the package.
+    Start installing from the pypi and piwheels pages of the package.
     """
-    tasks = []
     links = [PYPI_DOWNLOAD, PIWHEEL_DOWNLOAD]
     for link in links:
         url = link + name
@@ -301,40 +238,40 @@ def parse_pypi_and_piwheels(name, pk_version, cache_path, session):
 
         if r:
             files = BeautifulSoup(r.content, "html.parser")
-            tasks.extend(parse_package_page(files, pk_version, link, cache_path))
+            parse_package_page(files, pk_version, link, cache_path)
         else:
             sys.exit("\nUnable to find package {} on {}.\n".format(name, link))
-    return tasks
 
 
 def check_cache_path_writable(cache_path):
     """
     If the defined cache path is not writable, change it to a folder named
-    .cext_cache under the current directory where the script runs.
+    cext_cache under the current directory where the script runs.
     """
     try:
-        os.makedirs(cache_path, exist_ok=True)
         check_file = os.path.join(cache_path, "check.txt")
         with open(check_file, "w") as f:
             f.write("check")
         os.remove(check_file)
         return cache_path
     except OSError:
-        sys.exit(
-            f"Cache path {cache_path} is not writeable, please ensure that you choose a writable location."
+        new_path = os.path.realpath("cext_cache")
+        logger.info(
+            "The cache directory {old_path} is not writable. Changing to directory {new_path}.".format(
+                old_path=cache_path, new_path=new_path
+            )
         )
+        return new_path
 
 
-def parse_requirements(requirements_file, cache_path):
+def parse_requirements(args):
     """
     Parse the requirements.txt to get packages' names and versions,
     then install them.
     """
     # pip version needs to be greater than 19.3.1 to run this script
     # see https://github.com/pypa/pip/issues/6070
-    pip_version = str(
-        subprocess.check_output([sys.executable, "-m", "pip", "--version"])
-    )
+    pip_version = str(subprocess.check_output(["pip", "--version"]))
     pip_version_major = int(str(pip_version).split(".")[0].split("pip")[1].strip())
     if pip_version_major < 20:
         sys.exit(
@@ -344,27 +281,22 @@ def parse_requirements(requirements_file, cache_path):
     # Start a requests session to reuse HTTP connections
     session = requests.Session()
 
-    tasks = []
-    with open(requirements_file) as f:
+    with open(args.file) as f:
+        cache_path = os.path.realpath(args.cache_path)
+        cache_path = check_cache_path_writable(cache_path)
         for line in f:
             char_list = line.split("==")
             if len(char_list) == 2:
-                # Parse PyPi and Piwheels pages to collect the install tasks for
-                # the package according to its name and version
-                tasks.extend(
-                    parse_pypi_and_piwheels(
-                        char_list[0].strip(),
-                        char_list[1].strip(),
-                        cache_path,
-                        session,
-                    )
+                # Parse PyPi and Piwheels pages to install package according to
+                # its name and version
+                parse_pypi_and_piwheels(
+                    char_list[0].strip(), char_list[1].strip(), cache_path, session
                 )
             # Ignore comments
             elif not line.startswith("#"):
                 sys.exit(
                     "\nName format in cext.txt is incorrect. Should be 'packageName==packageVersion'.\n"
                 )
-    return tasks
 
 
 if __name__ == "__main__":
@@ -377,14 +309,8 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--cache-path",
-        default=".cext_cache",
+        default="/cext_cache",
         help="The path in which pip cache data is stored",
     )
     args = parser.parse_args()
-    requirements_file = args.file
-    if not os.path.exists(requirements_file):
-        sys.exit("Must specify a readable requirements file")
-    cache_path = os.path.realpath(args.cache_path)
-    check_cache_path_writable(cache_path)
-    install_tasks = parse_requirements(requirements_file, cache_path)
-    run_installs(install_tasks)
+    parse_requirements(args)

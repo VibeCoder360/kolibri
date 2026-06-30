@@ -81,7 +81,7 @@
   ],
   "dependencies": {
     "@vueuse/core": "catalog:",
-    "axios": "^1.16.0",
+    "axios": "^1.15.2",
     "clipboard": "^2.0.11",
     "fontfaceobserver": "^2.3.0",
     "frame-throttle": "^3.0.0",
@@ -93,7 +93,7 @@
     "lockr": "0.8.5",
     "lodash": "catalog:",
     "path-to-regexp": "1.9.0",
-    "qs": "^6.15.2",
+    "qs": "^6.14.2",
     "tippy.js": "^6.3.7",
     "ua-parser-js": "^1.0.41",
     "vue": "catalog:",

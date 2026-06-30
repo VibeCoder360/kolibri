@@ -4,6 +4,7 @@ from django.db import models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("discovery", "0008_networklocation_is_local"),
     ]

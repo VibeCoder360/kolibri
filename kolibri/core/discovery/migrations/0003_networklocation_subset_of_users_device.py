@@ -4,6 +4,7 @@ from django.db import models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("discovery", "0002_general_network_location_data_structure"),
     ]

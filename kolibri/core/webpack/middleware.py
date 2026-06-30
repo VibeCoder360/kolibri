@@ -4,6 +4,7 @@ from django.shortcuts import render
 
 from .hooks import WebpackError
 
+
 logger = logging.getLogger(__name__)
 
 

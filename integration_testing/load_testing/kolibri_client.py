@@ -2,7 +2,6 @@
 HTTP client for interacting with Kolibri APIs.
 Provides methods for device provisioning, user management, content import, and lesson creation.
 """
-
 import io
 import os
 import time
@@ -15,6 +14,7 @@ from requests.adapters import HTTPAdapter
 from requests.exceptions import RequestException
 from utils import generate_users_csv
 from utils import get_or_generate_lesson_resources
+
 
 TASKS_API_PATH = "/api/tasks/tasks/"
 LESSON_TITLE = "Load Test Lesson"

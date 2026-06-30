@@ -4,8 +4,7 @@ Code of Conduct
 ===============
 
 
-.. include:: ../../CODE_OF_CONDUCT.md
-   :parser: myst_parser.sphinx_
+.. mdinclude:: ../../CODE_OF_CONDUCT.md
 
 
 Reporting Guidelines

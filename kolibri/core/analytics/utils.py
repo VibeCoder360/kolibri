@@ -19,6 +19,8 @@ from le_utils.constants import content_kinds
 from morango.models import InstanceIDModel
 
 import kolibri
+from .constants import nutrition_endpoints
+from .models import PingbackNotification
 from kolibri.core.auth.constants import demographics
 from kolibri.core.auth.constants import role_kinds
 from kolibri.core.auth.models import Classroom
@@ -41,9 +43,6 @@ from kolibri.core.utils.lock import db_lock
 from kolibri.utils import conf
 from kolibri.utils.server import installation_type
 from kolibri.utils.time_utils import local_now
-
-from .constants import nutrition_endpoints
-from .models import PingbackNotification
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +80,7 @@ def calculate_list_stats(data):
 
 
 def calculate_demographic_stats(dataset_id=None, channel_id=None, learners=True):
+
     stats = {}
 
     # if learners=True, only include learners, otherwise only non-learners
@@ -142,6 +142,7 @@ def dump_zipped_json(data):
 
 
 def extract_facility_statistics(facility):
+
     dataset_id = facility.dataset_id
 
     settings = {
@@ -296,6 +297,7 @@ def extract_facility_statistics(facility):
 
 
 def extract_channel_statistics(channel):
+
     channel_id = channel.id
     tree_id = channel.root.tree_id
 
@@ -411,6 +413,7 @@ def create_and_update_notifications(data, source):
 
 
 def perform_ping(started, server=DEFAULT_SERVER_URL):
+
     client = NetworkClient(server)
 
     url = "/api/v1/pingback"

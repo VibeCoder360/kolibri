@@ -5,7 +5,6 @@ Kolibri Webpack hooks
 To manage assets, we use the webpack format. In order to have assets bundled in,
 you should put them in ``yourapp/frontend``.
 """
-
 import codecs
 import json
 import logging
@@ -27,6 +26,7 @@ from django.utils.translation import to_locale
 from importlib_resources import files
 
 from kolibri.plugins import hooks
+
 
 IGNORE_PATTERNS = (re.compile(I) for I in [r".+\.hot-update.js", r".+\.map"])
 

@@ -4,10 +4,7 @@
     role="alert"
     class="app-error"
   >
-    <img
-      src="./app-error-bird.png"
-      alt=""
-    >
+    <img src="./app-error-bird.png" >
 
     <h1>
       {{ headerText }}

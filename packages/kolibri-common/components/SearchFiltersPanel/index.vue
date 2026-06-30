@@ -1,6 +1,7 @@
 <template>
 
   <section
+    role="region"
     :closeButtonIconType="closeButtonIcon"
     :aria-label="filterAndSearchLabel$()"
     :ariaLabel="filterAndSearchLabel$()"
@@ -406,9 +407,9 @@
         this.currentCategory = null;
       },
       /**
+       * @public
        * Focuses on correct first element for FocusTrap depending on content
        * rendered in SearchFiltersPanel.
-       * @public
        */
       focusFirstEl() {
         if (this.$refs.searchBox) {
@@ -416,7 +417,6 @@
         }
       },
       /**
-       * Exit the nested category-selection view and return to the main panel.
        * @public
        */
       closeCategorySearch() {

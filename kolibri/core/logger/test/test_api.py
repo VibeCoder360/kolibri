@@ -2,7 +2,6 @@
 Tests that ensure the correct items are returned from api calls.
 Also tests whether the users with permissions can create logs.
 """
-
 import csv
 import datetime
 import os
@@ -16,6 +15,14 @@ from django.core.management import call_command
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
+from ..models import ContentSessionLog
+from ..models import ContentSummaryLog
+from ..models import GenerateCSVLogRequest
+from ..models import MasteryLog
+from .factory_logger import ContentSessionLogFactory
+from .factory_logger import ContentSummaryLogFactory
+from .factory_logger import FacilityUserFactory
+from .helpers import EvaluationMixin
 from kolibri.core.auth.management.commands.bulkexportusers import (
     CSV_EXPORT_FILENAMES as USER_CSV_EXPORT_FILENAMES,
 )
@@ -29,18 +36,9 @@ from kolibri.core.logger.tasks import log_exports_cleanup
 from kolibri.core.utils.csv import open_csv_for_reading
 from kolibri.utils.time_utils import local_now
 
-from ..models import ContentSessionLog
-from ..models import ContentSummaryLog
-from ..models import GenerateCSVLogRequest
-from ..models import MasteryLog
-from ..viewsets.mastery_log import MasteryLogSerializer
-from .factory_logger import ContentSessionLogFactory
-from .factory_logger import ContentSummaryLogFactory
-from .factory_logger import FacilityUserFactory
-from .helpers import EvaluationMixin
-
 
 class ContentSummaryLogCSVExportTestCase(APITestCase):
+
     databases = "__all__"
 
     fixtures = ["content_test.json"]
@@ -413,28 +411,6 @@ class MasteryLogViewSetTestCase(EvaluationMixin, APITestCase):
                     self.assertEqual(
                         self.user_tries[user_index][try_index].id, mastery_log["id"]
                     )
-
-    def test_list_response_fields(self):
-        """Assert the list endpoint returns exactly the documented fields."""
-        # user 2 has two complete tries for content_ids[0] (2 % 2 == 0)
-        user = self.users[2]
-        content_id = self.content_ids[0]
-        self.client.force_login(user)
-        response = self.client.get(
-            reverse("kolibri:core:masterylog-list"),
-            data={
-                "content": content_id,
-                "user": user.id,
-                "complete": True,
-                "quiz": True,
-            },
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertGreater(len(response.data), 0)
-        expected_fields = set(MasteryLogSerializer.Meta.fields)
-        self.assertEqual(set(response.data[0].keys()), expected_fields)
-        # correct is an annotated aggregate — must be an integer
-        self.assertIsInstance(response.data[0]["correct"], int)
 
     def test_diff(self):
         for user_index, user_tries in enumerate(self.user_tries):

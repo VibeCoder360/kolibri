@@ -225,7 +225,7 @@
     },
     props: {
       /**
-       * Vue-router link object.
+       * vue-router link object
        */
       to: {
         type: Object,

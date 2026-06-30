@@ -8,6 +8,7 @@ from django.db.models.fields import Field
 from django.utils import timezone
 from jsonfield import JSONField as JSONFieldBase
 
+
 date_time_format = "%Y-%m-%d %H:%M:%S.%f"
 tz_format = "({tz})"
 tz_regex = re.compile(r"\(([^\)]+)\)")

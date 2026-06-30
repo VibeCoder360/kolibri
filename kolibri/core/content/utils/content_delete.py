@@ -16,6 +16,7 @@ from kolibri.core.content.utils.importability_annotation import clear_channel_st
 from kolibri.core.content.utils.paths import get_content_database_file_path
 from kolibri.core.utils.lock import db_lock
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -104,10 +105,7 @@ def delete_content(
     except ChannelMetadata.DoesNotExist:
         raise KeyError("Channel matching id {id} does not exist".format(id=channel_id))
 
-    (
-        total_resource_number,
-        delete_all_metadata,
-    ) = delete_metadata(
+    (total_resource_number, delete_all_metadata,) = delete_metadata(
         channel,
         node_ids,
         exclude_node_ids,

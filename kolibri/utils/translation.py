@@ -6,7 +6,6 @@ https://github.com/django/django/blob/stable/3.2.x/django/utils/translation/tran
 
 In order to give a completely transparent interface.
 """
-
 import gettext as gettext_module
 import os
 from contextlib import ContextDecorator
@@ -20,6 +19,7 @@ from django.utils.safestring import SafeData
 from django.utils.translation.trans_real import DjangoTranslation
 
 import kolibri
+
 
 # Translations are cached in a dictionary for every language.
 # The active translations are stored by threadid to make them thread local.

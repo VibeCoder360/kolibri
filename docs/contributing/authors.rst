@@ -1,2 +1,1 @@
-.. include:: ../../AUTHORS.md
-   :parser: myst_parser.sphinx_
+.. mdinclude:: ../../AUTHORS.md

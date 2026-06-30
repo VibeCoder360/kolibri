@@ -30,13 +30,6 @@ const get = require('lodash/get');
 const each = require('lodash/forEach');
 const stripAnsi = require('strip-ansi');
 
-/**
- * @typedef {import('webpack').Compiler} Compiler
- * @typedef {import('webpack').Stats} Stats
- * @typedef {Record<string, unknown>} Options
- * @typedef {Record<string, unknown>} Contents
- */
-
 function getAssetPath(compilation, name) {
   return path.join(compilation.getPath(compilation.compiler.outputPath), name.split('?')[0]);
 }
@@ -48,8 +41,8 @@ function getSource(compilation, name) {
 
 class BundleTrackerPlugin {
   /**
-   * Track assets file location per bundle.
-   * @param {Options} options - plugin configuration overrides
+   * Track assets file location per bundle
+   * @param {Options} options
    */
   constructor(options) {
     /** @type {Options} */
@@ -67,9 +60,9 @@ class BundleTrackerPlugin {
     this.outputTrackerDir = '';
   }
   /**
-   * Populate options and output paths from the webpack compiler.
-   * @param {Compiler} compiler - webpack compiler instance
-   * @returns {this} this plugin instance for chaining
+   * Setup parameter from compiler data
+   * @param {Compiler} compiler
+   * @returns this
    */
   _setParamsFromCompiler(compiler) {
     this.options = defaults({}, this.options, {
@@ -92,9 +85,10 @@ class BundleTrackerPlugin {
     return this;
   }
   /**
-   * Write the bundle tracker stats JSON file.
-   * @param {Compiler} compiler - webpack compiler instance
-   * @param {Partial<Contents>} contents - stats fields to merge before writing
+   * Write bundle tracker stats file
+   *
+   * @param {Compiler} compiler
+   * @param {Partial<Contents>} contents
    */
   _writeOutput(compiler, contents) {
     assign(this.contents, contents, {
@@ -112,9 +106,8 @@ class BundleTrackerPlugin {
     );
   }
   /**
-   * Compute space-separated subresource integrity hashes for an asset body.
-   * @param {string} content - asset source to hash
-   * @returns {string} space-separated `<algorithm>-<base64>` hashes
+   * Compute hash for a content
+   * @param {string} content
    */
   _computeIntegrity(content) {
     // @ts-ignore: TS2532 this.options.integrityHashes can't be undefined here because
@@ -128,16 +121,16 @@ class BundleTrackerPlugin {
       .join(' ');
   }
   /**
-   * Mark the stats file as compiling when webpack begins a compilation.
-   * @param {Compiler} compiler - webpack compiler instance
+   * Handle compile hook
+   * @param {Compiler} compiler
    */
   _handleCompile(compiler) {
     this._writeOutput(compiler, { status: 'compile' });
   }
   /**
-   * Record the final asset and chunk information once compilation finishes.
-   * @param {Compiler} compiler - webpack compiler instance
-   * @param {Stats} stats - compilation stats from webpack
+   * Handle compile hook
+   * @param {Compiler} compiler
+   * @param {Stats} stats
    */
   _handleDone(compiler, stats) {
     if (stats.hasErrors()) {
@@ -211,8 +204,8 @@ class BundleTrackerPlugin {
     this._writeOutput(compiler, output);
   }
   /**
-   * Register the plugin's hooks on the webpack compiler.
-   * @param {Compiler} compiler - webpack compiler instance
+   * Method called by webpack to apply plugin hook
+   * @param {Compiler} compiler
    */
   apply(compiler) {
     this._setParamsFromCompiler(compiler);

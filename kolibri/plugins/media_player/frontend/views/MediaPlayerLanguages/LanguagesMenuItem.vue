@@ -40,7 +40,6 @@
     methods: {
       ...mapActions('mediaPlayer/captions', ['setLanguage']),
       /**
-       * Accessible via parent component refs.
        * @public
        */
       focus() {

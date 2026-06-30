@@ -33,10 +33,14 @@
         :disabled="formDisabled"
       />
 
-      <span class="select-button-label">
+      <label
+        class="select-button-label"
+        for="select-address-button"
+      >
         {{ selectDifferentDeviceLabel$() }}
-      </span>
+      </label>
       <KButton
+        id="select-address-button"
         appearance="basic-link"
         :text="getCommonSyncString('addNewAddressAction')"
         @click="showSelectAddressModal = true"

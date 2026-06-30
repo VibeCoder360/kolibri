@@ -5,6 +5,7 @@ import kolibri.core.fields
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("kolibriauth", "0019_collection_no_mptt"),
     ]

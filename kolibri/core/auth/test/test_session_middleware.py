@@ -11,6 +11,7 @@ def view(request):
 
 
 class CsrfViewMiddlewareTestMixin(SimpleTestCase):
+
     mw = KolibriSessionMiddleware()
 
     def test_process_request(self):

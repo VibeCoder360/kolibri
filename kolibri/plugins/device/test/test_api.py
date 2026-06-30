@@ -4,7 +4,7 @@ import mock
 from django.db.models import Q
 from django.urls import reverse
 
-import kolibri.plugins.device.viewsets.device
+import kolibri.plugins.device.api
 from kolibri.core.auth.models import FacilityUser
 from kolibri.core.auth.test.helpers import KolibriAPITestCase as APITestCase
 from kolibri.core.auth.test.helpers import setup_device
@@ -228,7 +228,7 @@ class DeviceChannelMetadataAPITestCase(APITestCase):
         self.assertEqual(response.data[0]["on_device_file_size"], 0)
 
     @mock.patch.object(
-        kolibri.plugins.device.viewsets.device,
+        kolibri.plugins.device.api,
         "renderable_contentnodes_without_topics_q_filter",
         Q(kind="dummy"),
     )

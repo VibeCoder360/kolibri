@@ -15,6 +15,7 @@ from ..constants.facility_presets import choices as facility_choices
 
 
 class Migration(migrations.Migration):
+
     dependencies = [("kolibriauth", "0006_auto_20171206_1207")]
 
     operations = [

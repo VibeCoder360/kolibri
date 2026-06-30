@@ -245,7 +245,7 @@
         loading: downloadRequestLoading,
       } = useDownloadRequests();
       const deviceFormTranslator = crossComponentTranslator(AddDeviceForm);
-      const { currentUserId, isUserLoggedIn, hasRole } = useUser();
+      const { currentUserId, isUserLoggedIn, isCoach, isAdmin, isSuperuser } = useUser();
 
       const channel = ref(null);
       const content = ref(null);
@@ -360,7 +360,9 @@
         loading,
         downloadRequestLoading,
         isUserLoggedIn,
-        hasRole,
+        isCoach,
+        isAdmin,
+        isSuperuser,
         currentUserId,
         showCompletedDownloadSnackbar,
         viewResourcesContents,
@@ -588,11 +590,10 @@
        * When a lessonId is given, this method will fetch the lesson and then fetch its
        * content nodes. The user is guaranteed to be logged in if there is a lessonId.
        *
-       * The nodes' progresses are mapped via the useContentNodeProgress composable.
-       * @modifies this.viewResourcesContents - Assigned the content nodes retrieved.
-       * @modifies useContentNodeProgress.contentNodeProgressMap (indirectly).
-       * @returns {Promise<void>} Resolves once the lesson and its resources have
-       * been fetched and assigned.
+       * The nodes' progresses are mapped via the useContentNodeProgress composable
+       *
+       * @modifies this.viewResourcesContents - Assigned the content nodes retrieved
+       * @modifies useContentNodeProgress.contentNodeProgressMap (indirectly)
        */
       fetchLessonSiblings() {
         // Get the lesson and then assign its resources to this.viewResourcesContents
@@ -612,13 +613,12 @@
        *
        * Then it will fetch the "next folder" - which is the next content for this.content that
        * is a topic.
-       * @modifies this.viewResourcesContents - Sets it to the progress-mapped nodes.
-       * @modifies this.nextFolder - Sets the value with this.content's parent's next sibling folder
-       * if found.
+       *
+       * @modifies this.viewResourcesContents - Sets it to the progress-mapped nodes
+       * @modifies this.nextFolder - Sets the value with this.content's parents next sibling folder
+       * if found
        * @modifies useContentNodeProgress.contentNodeProgressMap (indirectly) if the user
-       * is logged in.
-       * @returns {Promise<void>} Resolves once the parent's children and the next-folder
-       * pointer have been resolved (or immediately if there is no current content).
+       * is logged in
        */
       fetchSiblings() {
         if (!this.content) {
@@ -628,7 +628,7 @@
         const treeParams = {
           id: fetchGrandparent ? this.content.ancestors.slice(-2)[0].id : this.content.parent,
           params: {
-            include_coach_content: this.hasRole,
+            include_coach_content: this.isAdmin || this.isCoach || this.isSuperuser,
             depth: fetchGrandparent ? 2 : 1,
             baseurl: this.baseurl,
           },

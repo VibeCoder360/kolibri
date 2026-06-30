@@ -74,7 +74,7 @@
       const local_storage_last_synced = useLocalStorage('last_synced', '');
       const local_storage_lastDownloadRemoved = useLocalStorage('last_download_removed', '');
 
-      const { isAdmin, isLearner, isLearnerOnlyImport, canManageContent, hasRole } = useUser();
+      const { isAdmin, isLearner, isLearnerOnlyImport, canManageContent } = useUser();
 
       const setLastSyncedValue = newLastSyncValue => {
         local_storage_last_synced.value = newLastSyncValue;
@@ -97,7 +97,6 @@
         isLearner,
         isLearnerOnlyImport,
         canManageContent,
-        hasRole,
         local_storage_last_synced,
         local_storage_lastDownloadRemoved,
         setLastSyncedValue,
@@ -137,7 +136,7 @@
         return this.isLearner && this.lastDownloadRemoved && this.isLearnerOnlyImport;
       },
       availableDownload() {
-        return !this.canManageContent && this.hasDownloads && this.hasRole;
+        return !this.canManageContent && this.hasDownloads && !this.isLearner;
       },
       showBanner() {
         return (

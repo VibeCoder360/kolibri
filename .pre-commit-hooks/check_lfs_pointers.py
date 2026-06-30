@@ -9,10 +9,10 @@ Checks staged content (what will be committed) to verify it's an LFS pointer,
 not binary data. This works whether or not Git LFS is installed in the environment
 running the check.
 """
-
 import logging
 import subprocess
 import sys
+
 
 LFS_POINTER_HEADER = b"version https://git-lfs.github.com/spec/v1"
 

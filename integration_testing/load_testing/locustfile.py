@@ -14,7 +14,6 @@ Usage:
     KOLIBRI_NUM_USERS=50 \\
     locust -f locustfile.py -u 50 -r 50 --run-time 5m
 """
-
 import json
 import os
 import random
@@ -28,6 +27,7 @@ from kolibri_client import CSRFAdapter
 from locust import between
 from locust import HttpUser
 from locust import task
+
 
 # Load configuration from environment variables
 HAR_FILE = os.environ["KOLIBRI_HAR_FILE"]

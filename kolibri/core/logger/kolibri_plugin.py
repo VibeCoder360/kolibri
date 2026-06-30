@@ -11,6 +11,7 @@ from kolibri.core.logger.utils.attempt_log_consolidation import (
 from kolibri.core.logger.utils.exam_log_migration import migrate_from_exam_logs
 from kolibri.plugins.hooks import register_hook
 
+
 logger = logging.getLogger(__name__)
 
 

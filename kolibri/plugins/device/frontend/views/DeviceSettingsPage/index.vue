@@ -43,7 +43,7 @@
         </div>
 
         <div class="fieldset">
-          <span class="fieldset-label">{{ $tr('externalDeviceSettings') }}</span>
+          <label class="fieldset-label">{{ $tr('externalDeviceSettings') }}</label>
           <KCheckbox
             :label="$tr('unlistedChannels')"
             :checked="allowPeerUnlistedChannelImport"
@@ -68,7 +68,7 @@
         </div>
 
         <div class="fieldset">
-          <span class="fieldset-label">{{ $tr('landingPageLabel') }}</span>
+          <label class="fieldset-label">{{ $tr('landingPageLabel') }}</label>
           <KRadioButtonGroup>
             <KRadioButton
               data-testid="landingPageButton"
@@ -119,7 +119,7 @@
           class="fieldset"
         >
           <h2>
-            {{ $tr('allowDownloadOnMeteredConnection') }}
+            <label>{{ $tr('allowDownloadOnMeteredConnection') }}</label>
           </h2>
           <p :class="InfoDescriptionColor">
             {{ $tr('DownloadOnMeteredConnectionDescription') }}
@@ -205,7 +205,7 @@
 
         <div class="fieldset">
           <h2>
-            {{ $tr('autoDownload') }}
+            <label>{{ $tr('autoDownload') }}</label>
           </h2>
           <KCheckbox
             :label="$tr('enableAutoDownload')"

@@ -4,11 +4,8 @@ import pickBy from 'lodash/pickBy';
 import clamp from 'lodash/clamp';
 
 /**
- * Composable providing pagination state and navigation for the users table.
- * @param {object} options - Options object.
- * @param {object} options.usersCount - A ref or computed with the total number of users.
- * @param {object} options.totalPages - A ref or computed with the total number of pages.
- * @returns {object} Pagination state and navigation methods.
+ * Composable for managing pagination state and navigation
+ * Handles page changes, items per page, and URL query synchronization
  */
 export default function usePagination({ usersCount, totalPages } = {}) {
   const route = useRoute();

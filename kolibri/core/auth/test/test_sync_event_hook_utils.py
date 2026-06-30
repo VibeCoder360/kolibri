@@ -6,6 +6,7 @@ from morango.sync.context import LocalSessionContext
 from kolibri.core.auth.sync_event_hook_utils import post_sync_transfer_handler
 from kolibri.core.auth.sync_event_hook_utils import pre_sync_transfer_handler
 
+
 MODULE_NAME = "kolibri.core.auth.sync_event_hook_utils"
 
 

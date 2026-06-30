@@ -1,17 +1,22 @@
 name: npm Package Version Comment
-# Disabled on school fork — needs LE Bot secrets. See SCHOOL_FORK_CHANGES.md.
+
 on:
-  workflow_dispatch:
+  workflow_run:
+    workflows: [npm Package Version Check]
+    types:
+      - completed
+
 permissions:
   contents: read
   pull-requests: write
   actions: read
+
 jobs:
   comment:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6
       - name: Find PR by head SHA
         id: find-pr
         uses: actions/github-script@v9

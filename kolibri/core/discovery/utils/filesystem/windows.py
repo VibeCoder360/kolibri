@@ -38,6 +38,7 @@ def _get_drive_name(drive, path):
 
 
 def get_drive_list():
+
     drives = []
 
     try:
@@ -48,6 +49,7 @@ def get_drive_list():
         drive_list = _get_drive_list_powershell()
 
     for drive in drive_list:
+
         # look up the drive type name
         drivetype = _DRIVE_TYPES[int(drive.get("DriveType") or "0")]
 

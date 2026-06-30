@@ -34,6 +34,7 @@ from kolibri.core.content.utils.paths import get_zip_content_base_path
 from kolibri.core.discovery.utils.network.client import NetworkClient
 from kolibri.utils.file_transfer import RemoteFile
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -116,9 +117,9 @@ def add_security_headers(request, response):
         response.headers["Access-Control-Allow-Headers"] = requested_headers
     # restrict CSP to only allow resources to be loaded from self, to prevent info leakage
     # (e.g. via passing user info out as GET parameters to an attacker's server), or inadvertent data usage
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:"
-    )
+    response.headers[
+        "Content-Security-Policy"
+    ] = "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:"
 
     return response
 
@@ -408,6 +409,7 @@ def _zip_content_from_request(request):  # noqa: C901
     patch_response_headers(response, cache_timeout=YEAR_IN_SECONDS)
 
     if not isinstance(response, StreamingHttpResponse):
+
         cache.set(CACHE_KEY, response, YEAR_IN_SECONDS)
 
     return response

@@ -5,6 +5,7 @@ import kolibri.core.fields
 
 
 class Migration(migrations.Migration):
+
     dependencies = [("content", "0025_add_h5p_kind")]
 
     operations = [

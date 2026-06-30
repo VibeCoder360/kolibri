@@ -8,15 +8,14 @@ from mock import MagicMock
 from mock import patch
 from morango.models import Filter
 
+from .. import models
+from ..models import TestType
 from kolibri.core.auth.models import Classroom
 from kolibri.core.auth.models import Facility
 from kolibri.core.auth.models import FacilityUser
 from kolibri.core.auth.models import LearnerGroup
 from kolibri.core.auth.test.helpers import provision_device
 from kolibri.core.content.models import ContentNode
-
-from .. import models
-from ..models import TestType
 
 DUMMY_PASSWORD = "password"
 
@@ -448,17 +447,6 @@ class PreSaveKwargsTestMixin:
         instance.save()
         instance.refresh_from_db()
         self.assertIsNotNone(getattr(instance, self.user_field_name))
-
-    def test_update_of_existing_record_allows_null_user_field(self):
-        # A record can legitimately have a null authoring field if it synced in
-        # from another dataset (the cross-dataset superuser author was dropped).
-        # Updating such a record locally afterwards must not re-raise; the null
-        # check only applies when the record is first created.
-        instance = self.build_instance(with_user=False)
-        instance.save(update_dirty_bit_to=False)
-        instance.save()
-        instance.refresh_from_db()
-        self.assertIsNone(getattr(instance, self.user_field_name))
 
 
 class CourseSessionPreSaveTestCase(PreSaveKwargsTestMixin, TestCase):

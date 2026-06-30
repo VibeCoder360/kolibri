@@ -112,7 +112,6 @@
     },
     methods: {
       /**
-       * Moves keyboard focus to the first invalid password field, if any.
        * @public
        */
       focus() {
@@ -123,7 +122,6 @@
         }
       },
       /**
-       * Clears the password value and shifts focus back to the password input.
        * @public
        */
       resetAndFocus() {
@@ -132,7 +130,6 @@
         this.$refs.password.focus();
       },
       /**
-       * Clears all password field values and resets validation state without changing focus.
        * @public
        */
       reset() {

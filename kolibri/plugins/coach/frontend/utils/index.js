@@ -27,10 +27,7 @@ export const getDifficultQuestions = questions => {
 };
 
 /**
- * Merges params and query from a new route into the current route, overriding existing values.
- * @param {object} route - The current route object with params and query.
- * @param {object} newRoute - The new route object to merge params and query from.
- * @returns {object} A new route object with merged params and query.
+ * Override the route with a new one, preserving the params and query
  */
 export function overrideRoute(route, newRoute) {
   const { params, query } = route;

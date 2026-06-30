@@ -2,7 +2,6 @@
 Tests that ensure the correct items are returned from api calls.
 Also tests whether the users with permissions can create logs.
 """
-
 import uuid
 
 from django.core.exceptions import MultipleObjectsReturned
@@ -16,6 +15,11 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework.test import APITestCase
 
+from ..models import AttemptLog
+from ..models import ContentSessionLog
+from ..models import ContentSummaryLog
+from ..models import MasteryLog
+from .factory_logger import FacilityUserFactory
 from kolibri.core.auth.models import Classroom
 from kolibri.core.auth.test.helpers import provision_device
 from kolibri.core.auth.test.test_api import DUMMY_PASSWORD
@@ -36,12 +40,6 @@ from kolibri.core.notifications.api import quiz_answered_notification
 from kolibri.core.notifications.api import quiz_completed_notification
 from kolibri.core.notifications.api import quiz_started_notification
 from kolibri.utils.time_utils import local_now
-
-from ..models import AttemptLog
-from ..models import ContentSessionLog
-from ..models import ContentSummaryLog
-from ..models import MasteryLog
-from .factory_logger import FacilityUserFactory
 
 
 def create_assigned_quiz_for_user(user):
@@ -196,9 +194,7 @@ class ProgressTrackingViewSetStartSessionFreshTestCase(APITestCase):
         lesson = create_assigned_lesson_for_user(self.user)
         lesson_id = lesson.id
         node_id = self.node.id
-        with patch(
-            "kolibri.core.logger.viewsets.progress_tracking.wrap_to_save_queue"
-        ) as save_queue_mock:
+        with patch("kolibri.core.logger.api.wrap_to_save_queue") as save_queue_mock:
             response = self._make_request(
                 {
                     "lesson_id": lesson_id,
@@ -348,9 +344,7 @@ class ProgressTrackingViewSetStartSessionFreshTestCase(APITestCase):
         post_data = {
             "quiz_id": quiz.id,
         }
-        with patch(
-            "kolibri.core.logger.viewsets.progress_tracking.wrap_to_save_queue"
-        ) as save_queue_mock:
+        with patch("kolibri.core.logger.api.wrap_to_save_queue") as save_queue_mock:
             response = self.client.post(
                 reverse("kolibri:core:trackprogress-list"),
                 data=post_data,
@@ -407,9 +401,7 @@ class ProgressTrackingViewSetStartSessionFreshTestCase(APITestCase):
         post_data = {
             "quiz_id": quiz.id,
         }
-        with patch(
-            "kolibri.core.logger.viewsets.progress_tracking.wrap_to_save_queue"
-        ) as save_queue_mock:
+        with patch("kolibri.core.logger.api.wrap_to_save_queue") as save_queue_mock:
             response = self.client.post(
                 reverse("kolibri:core:trackprogress-list"),
                 data=post_data,
@@ -1696,9 +1688,7 @@ class ProgressTrackingViewSetLoggedInUpdateSessionTestCase(
             "context": {"node_id": self.node.id, "lesson_id": lesson_id}
         }
         self.session_log.save()
-        with patch(
-            "kolibri.core.logger.viewsets.progress_tracking.wrap_to_save_queue"
-        ) as save_queue_mock:
+        with patch("kolibri.core.logger.api.wrap_to_save_queue") as save_queue_mock:
             response = self._make_request(
                 {
                     "progress": 1.0,
@@ -1798,6 +1788,7 @@ class ProgressTrackingViewSetUpdateSessionAssessmentBase:
         )
 
     def test_update_assessment_session_no_attempt_id_or_item_id_fails(self):
+
         response = self._make_request(
             {
                 "interactions": [
@@ -1813,6 +1804,7 @@ class ProgressTrackingViewSetUpdateSessionAssessmentBase:
         self.assertEqual(response.status_code, 400)
 
     def test_update_assessment_session_no_answer_non_error_fails(self):
+
         response = self._make_request(
             {
                 "interactions": [
@@ -1828,6 +1820,7 @@ class ProgressTrackingViewSetUpdateSessionAssessmentBase:
         self.assertEqual(response.status_code, 400)
 
     def test_update_assessment_no_correct_fails(self):
+
         response = self._make_request(
             {
                 "interactions": [
@@ -1843,6 +1836,7 @@ class ProgressTrackingViewSetUpdateSessionAssessmentBase:
         self.assertEqual(response.status_code, 400)
 
     def test_update_assessment_no_time_spent_fails(self):
+
         response = self._make_request(
             {
                 "interactions": [
@@ -1858,6 +1852,7 @@ class ProgressTrackingViewSetUpdateSessionAssessmentBase:
         self.assertEqual(response.status_code, 400)
 
     def test_update_assessment_session_create_attempt_succeeds(self):
+
         response = self._make_request(
             {
                 "interactions": [
@@ -1884,6 +1879,7 @@ class ProgressTrackingViewSetUpdateSessionAssessmentBase:
         self.assertEqual(attempt.time_spent, 10)
 
     def test_update_assessment_session_create_errored_attempt_succeeds(self):
+
         response = self._make_request(
             {
                 "interactions": [
@@ -1917,6 +1913,7 @@ class ProgressTrackingViewSetUpdateSessionAssessmentBase:
         )
 
     def test_update_assessment_session_create_hinted_attempt_succeeds(self):
+
         response = self._make_request(
             {
                 "interactions": [
@@ -1952,6 +1949,7 @@ class ProgressTrackingViewSetUpdateSessionAssessmentBase:
         )
 
     def test_update_assessment_session_create_multiple_responses_succeeds(self):
+
         response = self._make_request(
             {
                 "interactions": [
@@ -2000,6 +1998,7 @@ class ProgressTrackingViewSetUpdateSessionAssessmentBase:
         )
 
     def test_update_assessment_session_create_multiple_responses_replace_succeeds(self):
+
         response = self._make_request(
             {
                 "interactions": [
@@ -2631,9 +2630,7 @@ class ProgressTrackingViewSetLoggedInUpdateSessionAssessmentTestCase(
             }
         }
         self.session_log.save()
-        with patch(
-            "kolibri.core.logger.viewsets.progress_tracking.wrap_to_save_queue"
-        ) as save_queue_mock:
+        with patch("kolibri.core.logger.api.wrap_to_save_queue") as save_queue_mock:
             response = self._make_request(
                 {
                     "interactions": [
@@ -2688,9 +2685,7 @@ class ProgressTrackingViewSetLoggedInUpdateSessionAssessmentTestCase(
             }
         }
         self.session_log.save()
-        with patch(
-            "kolibri.core.logger.viewsets.progress_tracking.wrap_to_save_queue"
-        ) as save_queue_mock:
+        with patch("kolibri.core.logger.api.wrap_to_save_queue") as save_queue_mock:
             response = self._make_request(
                 {
                     "interactions": [
@@ -2795,7 +2790,7 @@ class ProgressTrackingViewSetLoggedInUpdateSessionCoachQuizTestCase(
         )
 
     def test_update_assessment_session_update_time_delta_succeeds(self):
-        with patch("kolibri.core.logger.viewsets.progress_tracking.wrap_to_save_queue"):
+        with patch("kolibri.core.logger.api.wrap_to_save_queue"):
             response = self._make_request(
                 {
                     "time_spent_delta": 5,
@@ -2807,9 +2802,7 @@ class ProgressTrackingViewSetLoggedInUpdateSessionCoachQuizTestCase(
         self.assertEqual(self.mastery_log.time_spent, 5)
 
     def test_update_assessment_session_create_attempt_succeeds(self):
-        with patch(
-            "kolibri.core.logger.viewsets.progress_tracking.wrap_to_save_queue"
-        ) as save_queue_mock:
+        with patch("kolibri.core.logger.api.wrap_to_save_queue") as save_queue_mock:
             super(
                 ProgressTrackingViewSetLoggedInUpdateSessionCoachQuizTestCase, self
             ).test_update_assessment_session_create_attempt_succeeds()
@@ -2821,9 +2814,7 @@ class ProgressTrackingViewSetLoggedInUpdateSessionCoachQuizTestCase(
             self.assertIsInstance(save_queue_mock.mock_calls[0][1][2], str)
 
     def test_update_assessment_session_create_errored_attempt_succeeds(self):
-        with patch(
-            "kolibri.core.logger.viewsets.progress_tracking.wrap_to_save_queue"
-        ) as save_queue_mock:
+        with patch("kolibri.core.logger.api.wrap_to_save_queue") as save_queue_mock:
             super(
                 ProgressTrackingViewSetLoggedInUpdateSessionCoachQuizTestCase, self
             ).test_update_assessment_session_create_errored_attempt_succeeds()
@@ -2835,9 +2826,7 @@ class ProgressTrackingViewSetLoggedInUpdateSessionCoachQuizTestCase(
             self.assertIsInstance(save_queue_mock.mock_calls[0][1][2], str)
 
     def test_update_assessment_session_create_hinted_attempt_succeeds(self):
-        with patch(
-            "kolibri.core.logger.viewsets.progress_tracking.wrap_to_save_queue"
-        ) as save_queue_mock:
+        with patch("kolibri.core.logger.api.wrap_to_save_queue") as save_queue_mock:
             super(
                 ProgressTrackingViewSetLoggedInUpdateSessionCoachQuizTestCase, self
             ).test_update_assessment_session_create_hinted_attempt_succeeds()
@@ -2849,9 +2838,7 @@ class ProgressTrackingViewSetLoggedInUpdateSessionCoachQuizTestCase(
             self.assertIsInstance(save_queue_mock.mock_calls[0][1][2], str)
 
     def test_update_session_absolute_progress_triggers_completion(self):
-        with patch(
-            "kolibri.core.logger.viewsets.progress_tracking.wrap_to_save_queue"
-        ) as save_queue_mock:
+        with patch("kolibri.core.logger.api.wrap_to_save_queue") as save_queue_mock:
             self.summary_log.progress = 0.3
             self.summary_log.save()
             response = self.client.put(
@@ -3103,9 +3090,7 @@ class ProgressTrackingViewSetLoggedInUpdateSessionAssessmentPracticeQuizTestCase
             }
         }
         self.session_log.save()
-        with patch(
-            "kolibri.core.logger.viewsets.progress_tracking.wrap_to_save_queue"
-        ) as save_queue_mock:
+        with patch("kolibri.core.logger.api.wrap_to_save_queue") as save_queue_mock:
             response = self._make_request(
                 {
                     "interactions": [
@@ -3160,9 +3145,7 @@ class ProgressTrackingViewSetLoggedInUpdateSessionAssessmentPracticeQuizTestCase
             }
         }
         self.session_log.save()
-        with patch(
-            "kolibri.core.logger.viewsets.progress_tracking.wrap_to_save_queue"
-        ) as save_queue_mock:
+        with patch("kolibri.core.logger.api.wrap_to_save_queue") as save_queue_mock:
             response = self._make_request(
                 {
                     "interactions": [

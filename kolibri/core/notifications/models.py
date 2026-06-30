@@ -7,7 +7,6 @@ performance problems due to the locks on the main database.
 
 None of these models will have Morango synchronization
 """
-
 from django.db import models
 from morango.models import UUIDField
 

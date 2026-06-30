@@ -1,7 +1,6 @@
 """
 Tests for `kolibri.utils.options` module.
 """
-
 import logging
 import os
 import sys
@@ -135,6 +134,7 @@ def test_improper_settings_display_errors_and_exit(monkeypatch):
     """
 
     with activate_log_logger(monkeypatch):
+
         _, tmp_ini_path = tempfile.mkstemp(prefix="options", suffix=".ini")
 
         # non-numeric arguments for an integer option in the ini file cause it to bail
@@ -186,6 +186,7 @@ def test_deprecated_values_ini_file(monkeypatch):
     """
 
     with activate_log_logger(monkeypatch):
+
         _, tmp_ini_path = tempfile.mkstemp(prefix="options", suffix=".ini")
 
         # deprecated options in the ini file log warnings
@@ -201,6 +202,7 @@ def test_deprecated_values_envvars(monkeypatch):
     """
 
     with activate_log_logger(monkeypatch):
+
         _, tmp_ini_path = tempfile.mkstemp(prefix="options", suffix=".ini")
         # deprecated options in the envvars log warnings
         with open(tmp_ini_path, "w") as f:
@@ -223,6 +225,7 @@ def test_deprecated_envvars(monkeypatch):
     """
 
     with activate_log_logger(monkeypatch):
+
         _, tmp_ini_path = tempfile.mkstemp(prefix="options", suffix=".ini")
         # deprecated envvars for otherwise valid options log warnings
         with open(tmp_ini_path, "w") as f:
@@ -242,6 +245,7 @@ def test_deprecated_aliases(monkeypatch):
     """
 
     with activate_log_logger(monkeypatch):
+
         _, tmp_ini_path = tempfile.mkstemp(prefix="options", suffix=".ini")
         # deprecated aliases for otherwise valid options log warnings
         with open(tmp_ini_path, "w") as f:
@@ -256,6 +260,7 @@ def test_deprecated_aliases_envvars(monkeypatch):
     """
 
     with activate_log_logger(monkeypatch):
+
         _, tmp_ini_path = tempfile.mkstemp(prefix="options", suffix=".ini")
         # envvars for deprecated aliases of otherwise valid options log warnings
         with open(tmp_ini_path, "w") as f:
@@ -294,6 +299,7 @@ def test_option_writing():
     with mock.patch.dict(
         os.environ, {"KOLIBRI_HOME": os.environ["KOLIBRI_HOME"]}, clear=True
     ):
+
         # check that values are set correctly to begin with
         OPTIONS = options.read_options_file(ini_filename=tmp_ini_path)
         assert OPTIONS["Paths"]["CONTENT_DIR"] == _OLD_CONTENT_DIR
@@ -336,6 +342,7 @@ def test_path_expansion():
     absolute_path = "C:\\absolute" if sys.platform == "win32" else "/absolute"
 
     with mock.patch("kolibri.utils.conf.KOLIBRI_HOME", KOLIBRI_HOME_TEMP):
+
         with mock.patch.dict(os.environ, {"KOLIBRI_CONTENT_DIR": absolute_path}):
             OPTIONS = options.read_options_file(ini_filename=tmp_ini_path)
             assert OPTIONS["Paths"]["CONTENT_DIR"] == absolute_path

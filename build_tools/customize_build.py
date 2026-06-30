@@ -5,7 +5,6 @@ the DJANGO_SETTINGS_MODULE environment variable.
 
 For more detail see the documentation in __init__.py
 """
-
 import logging
 import os
 import sys

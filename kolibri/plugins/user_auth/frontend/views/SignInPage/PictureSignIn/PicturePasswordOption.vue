@@ -6,7 +6,6 @@
       option region clickable/activatable while keeping a single focusable element.
     -->
     <label
-      :for="checkboxId"
       class="option-label"
       :class="[
         $computedClass(optionLabelStyles),
@@ -21,7 +20,6 @@
         `aria-disabled` communicates the disabled state to assistive technology.
       -->
       <input
-        :id="checkboxId"
         type="checkbox"
         class="visuallyhidden"
         :checked="isSelected"
@@ -80,9 +78,6 @@
     setup(props, { emit }) {
       const $themeTokens = themeTokens();
       const $themePalette = themePalette();
-
-      // Unique per page because the parent (PicturePasswordGrid) renders each icon exactly once.
-      const checkboxId = `picture-password-option-${props.icon}`;
 
       const isSelected = computed(() => props.sequencePosition !== null);
 
@@ -154,7 +149,6 @@
       };
 
       return {
-        checkboxId,
         isSelected,
         iconColor,
         optionLabelStyles,
@@ -180,7 +174,7 @@
         required: true,
       },
       /**
-       * Position in the selection sequence when this option is selected
+       * position in the selection sequence when this option is selected
        * or null when unselected.
        */
       sequencePosition: {

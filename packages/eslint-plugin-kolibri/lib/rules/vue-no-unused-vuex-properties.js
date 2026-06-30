@@ -1,5 +1,5 @@
 /**
- * @file Disallow unused Vuex state and getters.
+ * @fileoverview Disallow unused Vuex state and getters.
  */
 
 'use strict';

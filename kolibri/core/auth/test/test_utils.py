@@ -11,6 +11,7 @@ from morango.sync.context import CompositeSessionContext
 from morango.sync.context import LocalSessionContext
 from morango.sync.context import NetworkSessionContext
 
+from ..models import Facility
 from kolibri.core.auth.management import utils
 from kolibri.core.auth.models import AdHocGroup
 from kolibri.core.auth.models import Classroom
@@ -25,8 +26,6 @@ from kolibri.core.auth.utils.delete import get_delete_group_for_facility
 from kolibri.core.auth.utils.migrate import fork_facility
 from kolibri.core.auth.utils.migrate import merge_users
 from kolibri.core.logger import models as log_models
-
-from ..models import Facility
 
 
 class GetFacilityTestCase(TestCase):
@@ -371,6 +370,7 @@ class MergeUsersTestCase(TestCase):
             summ_logs = []
 
             for channel_id, content_id in content_identifiers:
+
                 sess_logs.append(
                     ContentSessionLogFactory.create(
                         user=user,
@@ -521,6 +521,7 @@ class ForkFacilityTestCase(TestCase):
             adhocgroup.add_member(user)
 
             for channel_id, content_id in content_identifiers:
+
                 ContentSessionLogFactory.create(
                     user=user,
                     channel_id=channel_id,

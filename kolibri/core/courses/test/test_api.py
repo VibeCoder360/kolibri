@@ -1,11 +1,10 @@
 import uuid
 
 from django.urls import reverse
-from django.utils import timezone
-from le_utils.constants import content_kinds
 from le_utils.constants import modalities
 from rest_framework import status
 
+from .. import models
 from kolibri.core.auth.constants import collection_kinds
 from kolibri.core.auth.models import AdHocGroup
 from kolibri.core.auth.models import Classroom
@@ -16,14 +15,6 @@ from kolibri.core.auth.test.helpers import KolibriAPITestCase as APITestCase
 from kolibri.core.auth.test.helpers import provision_device
 from kolibri.core.content.models import ChannelMetadata
 from kolibri.core.content.models import ContentNode
-from kolibri.core.logger.models import ContentSummaryLog
-from kolibri.core.logger.models import MasteryLog
-from kolibri.core.logger.utils.pre_post_test import get_synthetic_content_id
-
-from .. import models
-from ..models import TestType
-from ..models import UnitPhase
-from ..models import UnitTestAssignment
 
 DUMMY_PASSWORD = "password"
 
@@ -90,6 +81,7 @@ class CourseSessionAPITestCase(APITestCase):
         )
 
     def test_logged_in_user_course_session_no_delete(self):
+
         user = FacilityUser.objects.create(username="learner", facility=self.facility)
         user.set_password("pass")
         user.save()
@@ -105,6 +97,7 @@ class CourseSessionAPITestCase(APITestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_logged_in_admin_course_session_delete(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.delete(
@@ -116,6 +109,7 @@ class CourseSessionAPITestCase(APITestCase):
         self.assertEqual(response.status_code, 204)
 
     def test_logged_in_admin_course_session_create(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.post(
@@ -132,6 +126,7 @@ class CourseSessionAPITestCase(APITestCase):
         self.assertEqual(created_by, self.admin.id)
 
     def test_logged_in_admin_course_session_create_with_assignments(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.post(
@@ -153,6 +148,7 @@ class CourseSessionAPITestCase(APITestCase):
         )
 
     def test_logged_in_admin_course_session_update_no_assignments(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.post(
@@ -182,6 +178,7 @@ class CourseSessionAPITestCase(APITestCase):
         )
 
     def test_logged_in_admin_course_session_update_different_assignments(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.post(
@@ -218,6 +215,7 @@ class CourseSessionAPITestCase(APITestCase):
         )
 
     def test_logged_in_admin_course_session_update_additional_assignments(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.post(
@@ -260,6 +258,7 @@ class CourseSessionAPITestCase(APITestCase):
         )
 
     def test_logged_in_admin_course_session_create_learner_assignments(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         user = FacilityUser.objects.create(username="u", facility=self.facility)
@@ -297,6 +296,7 @@ class CourseSessionAPITestCase(APITestCase):
         self.assertEqual(adhoc_group.kind, collection_kinds.ADHOCLEARNERSGROUP)
 
     def test_logged_in_admin_course_session_update_learner_assignments(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.post(
@@ -346,6 +346,7 @@ class CourseSessionAPITestCase(APITestCase):
     def test_logged_in_admin_course_session_update_learner_assignments_wrong_collection(
         self,
     ):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.post(
@@ -382,6 +383,7 @@ class CourseSessionAPITestCase(APITestCase):
             AdHocGroup.objects.get(parent=self.classroom)
 
     def test_logged_in_user_course_session_no_create(self):
+
         # user without admin nor coach rights
         user = FacilityUser.objects.create(username="learner", facility=self.facility)
         user.set_password("pass")
@@ -401,6 +403,7 @@ class CourseSessionAPITestCase(APITestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_logged_in_admin_course_session_update_basic(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.put(
@@ -443,6 +446,7 @@ class CourseSessionAPITestCase(APITestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_can_get_course_session_list(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.get(
@@ -465,6 +469,7 @@ class CourseSessionAPITestCase(APITestCase):
         )
 
     def test_coach_can_see_only_allowed_course_sessions(self):
+
         self.client.login(username=self.coach.username, password=DUMMY_PASSWORD)
         response = self.client.get(reverse("kolibri:core:coursesession-list"))
 
@@ -478,6 +483,7 @@ class CourseSessionAPITestCase(APITestCase):
         self.assertIn(self.courseSession_2.id, course_session_ids)
 
     def test_cannot_create_course_session_with_non_existent_course_id(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.post(
@@ -492,6 +498,7 @@ class CourseSessionAPITestCase(APITestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_cannot_create_course_session_with_non_course_modality(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         # Create a content node that is not a COURSE
@@ -549,6 +556,7 @@ class CourseSessionAPITestCase(APITestCase):
         self.assertNotIn(other_course_session.id, course_session_ids)
 
     def test_coach_can_create_course_session(self):
+
         self.client.login(username=self.coach.username, password=DUMMY_PASSWORD)
 
         response = self.client.post(
@@ -563,6 +571,7 @@ class CourseSessionAPITestCase(APITestCase):
         self.assertEqual(response.status_code, 201)
 
     def test_learner_cannot_create_course_session(self):
+
         learner = FacilityUser.objects.create(
             username="learner", facility=self.facility
         )
@@ -684,387 +693,6 @@ class CourseSessionAPITestCase(APITestCase):
         session = models.CourseSession.objects.get(id=response.data["id"])
         self.assertIsNone(session.channel_version)
 
-    def _create_and_fetch_session(self, payload):
-        create_resp = self.client.post(
-            reverse("kolibri:core:coursesession-list"),
-            payload,
-            format="json",
-        )
-        self.assertEqual(create_resp.status_code, 201)
-        course_session_id = create_resp.data["id"]
-        response = self.client.get(
-            reverse(
-                "kolibri:core:coursesession-detail", kwargs={"pk": course_session_id}
-            ),
-        )
-        self.assertEqual(response.status_code, 200)
-        return response.data
-
-    def test_course_session_list_response_shape(self):
-        self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
-
-        # Create a session with an assignment so assignments list is non-empty
-        cs = self._create_and_fetch_session(
-            {
-                "active": True,
-                "collection": self.classroom.id,
-                "course": self.course.id,
-                "assignments": [self.classroom.id],
-            }
-        )
-
-        # All top-level fields must be present
-        for field in (
-            "id",
-            "title",
-            "description",
-            "course",
-            "active",
-            "collection",
-            "classroom",
-            "created_by",
-            "date_created",
-            "assignments",
-            "missing_resource",
-            "learner_ids",
-        ):
-            self.assertIn(field, cs, msg=f"Missing field: {field}")
-
-        # 'is_active' must not appear — should be renamed to 'active'
-        self.assertNotIn("is_active", cs)
-
-        # classroom must be a dict with exactly id, name, parent
-        classroom = cs["classroom"]
-        self.assertIsInstance(classroom, dict)
-        self.assertEqual(classroom["id"], self.classroom.id)
-        self.assertEqual(classroom["name"], "Classroom")
-        self.assertEqual(classroom["parent"], self.facility.id)
-
-        # active must reflect True (we created with active=True)
-        self.assertTrue(cs["active"])
-
-        # assignments must contain the classroom id
-        self.assertIn(self.classroom.id, cs["assignments"])
-
-        # missing_resource must be False (self.course has available=True)
-        self.assertFalse(cs["missing_resource"])
-
-        # learner_ids must be a list
-        self.assertIsInstance(cs["learner_ids"], list)
-
-    def test_missing_resource_true_when_course_unavailable(self):
-        self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
-
-        unavailable_course = ContentNode.objects.create(
-            id=uuid.uuid4().hex,
-            channel_id=self.course.channel_id,
-            content_id=uuid.uuid4().hex,
-            parent=self.root_node,
-            available=False,
-            modality=modalities.COURSE,
-            title="Unavailable Course",
-            description="A course",
-        )
-        cs = self._create_and_fetch_session(
-            {
-                "active": True,
-                "collection": self.classroom.id,
-                "course": unavailable_course.id,
-            }
-        )
-        self.assertTrue(cs["missing_resource"])
-
-    def test_learner_ids_populated_in_response(self):
-        self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
-
-        learner_a = FacilityUser.objects.create(
-            username="learner_shape_a", facility=self.facility
-        )
-        learner_b = FacilityUser.objects.create(
-            username="learner_shape_b", facility=self.facility
-        )
-        self.classroom.add_member(learner_a)
-        self.classroom.add_member(learner_b)
-
-        cs = self._create_and_fetch_session(
-            {
-                "active": True,
-                "collection": self.classroom.id,
-                "course": self.course.id,
-                "learner_ids": [learner_a.id, learner_b.id],
-            }
-        )
-        self.assertIn(learner_a.id, cs["learner_ids"])
-        self.assertIn(learner_b.id, cs["learner_ids"])
-        # The ad-hoc group must NOT appear in assignments (consolidate() strips it)
-        self.assertEqual(cs["assignments"], [])
-
-
-class CourseSessionProgressAPITestCase(APITestCase):
-    """Tests for unit_phase, active_unit_number, active_unit_title, test_learner_progress."""
-
-    databases = "__all__"
-
-    @classmethod
-    def setUpTestData(cls):
-        provision_device()
-        cls.facility = Facility.objects.create(name="ProgressFac")
-        cls.admin = FacilityUser.objects.create(
-            username="progressadmin", facility=cls.facility
-        )
-        cls.admin.set_password(DUMMY_PASSWORD)
-        cls.admin.save()
-        cls.facility.add_admin(cls.admin)
-
-        cls.learner1 = cls._create_learner("learner1")
-        cls.learner2 = cls._create_learner("learner2")
-
-        cls.classroom = Classroom.objects.create(
-            name="ProgressClass", parent=cls.facility
-        )
-        cls.classroom.add_member(cls.learner1)
-        cls.classroom.add_member(cls.learner2)
-
-        channel_id = uuid.uuid4().hex
-        cls.root_node = ContentNode.objects.create(
-            id=uuid.uuid4().hex,
-            channel_id=channel_id,
-            content_id=uuid.uuid4().hex,
-            available=True,
-            title="Channel Root",
-        )
-        cls.channel = ChannelMetadata.objects.create(
-            id=channel_id,
-            name="Progress Test Channel",
-            version=1,
-            root=cls.root_node,
-            min_schema_version="1",
-        )
-        cls.course = ContentNode.objects.create(
-            id=uuid.uuid4().hex,
-            channel_id=channel_id,
-            content_id=uuid.uuid4().hex,
-            parent=cls.root_node,
-            available=True,
-            modality=modalities.COURSE,
-            title="Test Course",
-        )
-        cls.unit = ContentNode.objects.create(
-            id=uuid.uuid4().hex,
-            channel_id=channel_id,
-            content_id=uuid.uuid4().hex,
-            parent=cls.course,
-            available=True,
-            modality=modalities.UNIT,
-            title="Unit One",
-        )
-        # Rebuild MPTT tree so lft/rght/level values are consistent
-        ContentNode.objects.rebuild()
-
-        cls.course_session = models.CourseSession.objects.create(
-            is_active=True,
-            collection=cls.classroom,
-            created_by=cls.admin,
-            course=cls.course.id,
-            title=cls.course.title,
-        )
-        # Assign the classroom as a recipient
-        models.CourseSessionAssignment.objects.create(
-            course_session=cls.course_session,
-            collection=cls.classroom,
-            assigned_by=cls.admin,
-        )
-
-    def setUp(self):
-        self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
-
-    @classmethod
-    def _create_learner(cls, username):
-        user = FacilityUser.objects.create(username=username, facility=cls.facility)
-        user.set_password(DUMMY_PASSWORD)
-        user.save()
-        return user
-
-    def _create_test_assignment(self, test_type, closed):
-        return UnitTestAssignment.objects.create(
-            course_session=self.course_session,
-            unit_contentnode_id=self.unit.id,
-            collection=self.classroom,
-            test_type=test_type,
-            activated_by=self.admin,
-            closed=closed,
-        )
-
-    def _make_learner_log(self, user, content_id, complete):
-        sl = ContentSummaryLog.objects.create(
-            user=user,
-            content_id=content_id,
-            channel_id=None,
-            kind=content_kinds.QUIZ,
-            start_timestamp=timezone.now(),
-        )
-        MasteryLog.objects.create(
-            user=user,
-            summarylog=sl,
-            complete=complete,
-            mastery_level=-1,
-            start_timestamp=timezone.now(),
-        )
-
-    def _get_session_data(self):
-        """Return the first (and only) item from the list endpoint."""
-        resp = self.client.get(
-            reverse("kolibri:core:coursesession-list"),
-            {"collection": self.classroom.id},
-        )
-        self.assertEqual(resp.status_code, 200)
-        items = [i for i in resp.data if str(i["id"]) == str(self.course_session.id)]
-        self.assertEqual(len(items), 1)
-        return items[0]
-
-    def test_no_test_returns_pre_test_pending_and_null_progress(self):
-        data = self._get_session_data()
-        self.assertEqual(data["unit_phase"], UnitPhase.PreTestPending)
-        self.assertIsNone(data["test_learner_progress"])
-        self.assertIsNotNone(data["active_unit_number"])
-        self.assertEqual(data["active_unit_number"], 1)
-        self.assertEqual(data["active_unit_title"], self.unit.title)
-
-    def test_pre_test_active_returns_correct_progress(self):
-        self._create_test_assignment(TestType.Pre, closed=False)
-        synthetic_cid = get_synthetic_content_id(
-            str(self.course_session.id), str(self.unit.id), TestType.Pre
-        )
-        self._make_learner_log(self.learner1, synthetic_cid, True)
-        self._make_learner_log(self.learner2, synthetic_cid, False)
-
-        data = self._get_session_data()
-        self.assertEqual(data["unit_phase"], UnitPhase.PreTestActive)
-        self.assertEqual(data["active_unit_number"], 1)
-        progress = data["test_learner_progress"]
-        self.assertIsNotNone(progress)
-        self.assertEqual(progress["completed"], 1)
-        self.assertEqual(progress["started"], 1)
-        self.assertEqual(progress["notStarted"], 0)
-        self.assertEqual(progress["total"], 2)
-
-    def test_post_test_active_returns_correct_progress(self):
-        self._create_test_assignment(TestType.Pre, closed=True)
-        self._create_test_assignment(TestType.Post, closed=False)
-        synthetic_cid = get_synthetic_content_id(
-            str(self.course_session.id), str(self.unit.id), TestType.Post
-        )
-        self._make_learner_log(self.learner1, synthetic_cid, True)
-
-        data = self._get_session_data()
-        self.assertEqual(data["unit_phase"], UnitPhase.PostTestActive)
-        progress = data["test_learner_progress"]
-        self.assertIsNotNone(progress)
-        self.assertEqual(progress["completed"], 1)
-        self.assertEqual(progress["started"], 0)
-        self.assertEqual(progress["notStarted"], 1)
-        self.assertEqual(progress["total"], 2)
-
-    def test_complete_phase_returns_post_test_progress(self):
-        self._create_test_assignment(TestType.Pre, closed=True)
-        self._create_test_assignment(TestType.Post, closed=True)
-        synthetic_cid = get_synthetic_content_id(
-            str(self.course_session.id), str(self.unit.id), TestType.Post
-        )
-        self._make_learner_log(self.learner1, synthetic_cid, True)
-        self._make_learner_log(self.learner2, synthetic_cid, True)
-
-        data = self._get_session_data()
-        self.assertEqual(data["unit_phase"], UnitPhase.Complete)
-        self.assertIsNone(data["active_unit_number"])
-        progress = data["test_learner_progress"]
-        self.assertIsNotNone(progress)
-        self.assertEqual(progress["completed"], 2)
-        self.assertEqual(progress["started"], 0)
-        self.assertEqual(progress["notStarted"], 0)
-        self.assertEqual(progress["total"], 2)
-
-    def test_post_test_pending_returns_correct_phase_and_progress(self):
-        # Pre-test closed, post-test not yet activated: PostTestPending
-        self._create_test_assignment(TestType.Pre, closed=True)
-        synthetic_cid = get_synthetic_content_id(
-            str(self.course_session.id), str(self.unit.id), TestType.Pre
-        )
-        self._make_learner_log(self.learner1, synthetic_cid, True)
-        self._make_learner_log(self.learner2, synthetic_cid, False)
-
-        data = self._get_session_data()
-        self.assertEqual(data["unit_phase"], UnitPhase.PostTestPending)
-        self.assertEqual(data["active_unit_number"], 1)
-        # Progress reflects the closed pre-test (last test for the unit)
-        progress = data["test_learner_progress"]
-        self.assertIsNotNone(progress)
-        self.assertEqual(progress["completed"], 1)
-        self.assertEqual(progress["started"], 1)
-        self.assertEqual(progress["notStarted"], 0)
-        self.assertEqual(progress["total"], 2)
-
-    def test_duplicate_mastery_log_complete_wins(self):
-        # A learner with both complete=True and complete=False MasteryLog rows for
-        # the same ContentSummaryLog should be counted as completed (dedup rule).
-        self._create_test_assignment(TestType.Pre, closed=False)
-        synthetic_cid = get_synthetic_content_id(
-            str(self.course_session.id), str(self.unit.id), TestType.Pre
-        )
-        # learner1: one ContentSummaryLog, two MasteryLog rows (incomplete then complete)
-        sl = ContentSummaryLog.objects.create(
-            user=self.learner1,
-            content_id=synthetic_cid,
-            channel_id=None,
-            kind=content_kinds.QUIZ,
-            start_timestamp=timezone.now(),
-        )
-        MasteryLog.objects.create(
-            user=self.learner1,
-            summarylog=sl,
-            complete=False,
-            mastery_level=-1,
-            start_timestamp=timezone.now(),
-        )
-        MasteryLog.objects.create(
-            user=self.learner1,
-            summarylog=sl,
-            complete=True,
-            mastery_level=-2,
-            start_timestamp=timezone.now(),
-        )
-        # learner2: not started
-        data = self._get_session_data()
-        progress = data["test_learner_progress"]
-        self.assertIsNotNone(progress)
-        self.assertEqual(progress["completed"], 1)
-        self.assertEqual(progress["started"], 0)
-        self.assertEqual(progress["notStarted"], 1)
-        self.assertEqual(progress["total"], 2)
-
-    def test_deleted_group_member_excluded_from_total(self):
-        # A learner who is a classroom member but has date_deleted set must not
-        # inflate total/notStarted — _fetch_group_memberships filters on
-        # FacilityUser.get_is_active_q().
-        deleted_learner = FacilityUser.objects.create(
-            username="deletedlearner", facility=self.facility
-        )
-        self.classroom.add_member(deleted_learner)
-        # Soft-delete via update() to leave the Membership row intact so the
-        # filter in _fetch_group_memberships is what excludes the user.
-        FacilityUser.objects.filter(pk=deleted_learner.pk).update(
-            date_deleted=timezone.now()
-        )
-
-        self._create_test_assignment(TestType.Pre, closed=False)
-
-        data = self._get_session_data()
-        progress = data["test_learner_progress"]
-        self.assertIsNotNone(progress)
-        # Only learner1 and learner2 are active; deleted_learner must not count.
-        self.assertEqual(progress["total"], 2)
-        self.assertEqual(progress["notStarted"], 2)
-
 
 """"
 DISCLAIMER:  Some parts of these tests were written with an AI assistance.
@@ -1078,6 +706,7 @@ kolibri/core/courses/test/test_api.py:805:"
 
 
 class UnitTestActivationAPITestCase(APITestCase):
+
     databases = "__all__"
 
     @classmethod
@@ -1623,12 +1252,15 @@ class LastUnitTestAPITestCase(APITestCase):
             (self.unit3, "pre"),
             (self.unit3, "post"),
         ]
+        result = None
         for step_unit, step_type in steps:
-            closed = not (step_unit == unit and step_type == test_type)
-            result = self._create_test(step_unit, step_type, closed)
-            if not closed:
-                return result
-        return None
+            is_target = step_unit == unit and step_type == test_type
+            result = self._create_test(
+                step_unit, step_type, False if is_target else True
+            )
+            if is_target:
+                break
+        return result
 
     # --- Permission tests ---
 

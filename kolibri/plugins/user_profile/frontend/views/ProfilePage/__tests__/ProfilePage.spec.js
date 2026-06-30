@@ -88,6 +88,7 @@ describe('picture password row', () => {
   } = {}) {
     useUser.mockImplementation(() =>
       useUserMock({
+        userKind,
         isLearner: userKind === UserKinds.LEARNER,
         isCoach: userKind === UserKinds.COACH,
         isAdmin: userKind === UserKinds.ADMIN || userKind === UserKinds.SUPERUSER,

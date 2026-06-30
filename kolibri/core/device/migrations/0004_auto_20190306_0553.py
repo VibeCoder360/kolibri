@@ -4,6 +4,7 @@ from django.db import models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [("device", "0003_contentcachekey")]
 
     operations = [

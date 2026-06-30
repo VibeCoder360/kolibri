@@ -1,7 +1,6 @@
 """
 Mixins for Django REST Framework ViewSets and Django Querysets
 """
-
 import logging
 from uuid import UUID
 
@@ -21,13 +20,14 @@ logger = logging.getLogger(__name__)
 
 class BulkCreateMixin:
     def get_serializer(self, *args, **kwargs):
-        """if an array is passed, set serializer to many"""
+        """ if an array is passed, set serializer to many """
         if isinstance(kwargs.get("data", {}), list):
             kwargs["many"] = True
         return super().get_serializer(*args, **kwargs)
 
 
 class BulkDeleteMixin:
+
     # Taken from https://github.com/miki725/django-rest-framework-bulk
 
     def allow_bulk_destroy(self):

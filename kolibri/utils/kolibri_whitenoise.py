@@ -24,6 +24,7 @@ from whitenoise.string_utils import decode_path_info
 from kolibri.core.discovery.utils.network.client import NetworkClient
 from kolibri.utils.file_transfer import RemoteFile
 
+
 compressed_file_extensions = ("gz",)
 
 
@@ -315,7 +316,7 @@ class DynamicWhiteNoise(WhiteNoise):
         static_prefix=None,
         writable_locations=(0,),
         app_paths=None,
-        **kwargs,
+        **kwargs
     ):
         whitenoise_settings = {
             # Use 120 seconds as the default cache time for static assets

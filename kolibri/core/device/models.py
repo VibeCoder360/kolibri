@@ -11,6 +11,8 @@ from morango.models import UUIDField
 from morango.models.core import InstanceIDModel
 from morango.models.core import SyncSession
 
+from .utils import LANDING_PAGE_LEARN
+from .utils import LANDING_PAGE_SIGN_IN
 from kolibri.core.auth.constants import role_kinds
 from kolibri.core.auth.constants.demographics import custom_demographics_schema
 from kolibri.core.auth.constants.demographics import DescriptionTranslationValidator
@@ -35,9 +37,6 @@ from kolibri.deployment.default.sqlite_db_names import SYNC_QUEUE
 from kolibri.utils.conf import OPTIONS
 from kolibri.utils.data import ChoicesEnum
 from kolibri.utils.options import update_options_file
-
-from .utils import LANDING_PAGE_LEARN
-from .utils import LANDING_PAGE_SIGN_IN
 
 device_permissions_fields = ["is_superuser", "can_manage_content"]
 
@@ -335,7 +334,8 @@ class SyncQueueQuerySet(QuerySet):
             .annotate(
                 # so a record's score is promoted by up to half the sync interval if it has
                 # missed its rendezvous time
-                score=F("time_since_last_sync") - F("time_to_attempt"),
+                score=F("time_since_last_sync")
+                - F("time_to_attempt"),
             )
             .order_by("-score", "datetime")
         )
@@ -423,7 +423,7 @@ class SyncQueue(models.Model):
 
     @property
     def attempt_at(self):
-        """Returns the time in seconds since epoch for the next rendezvous"""
+        """ Returns the time in seconds since epoch for the next rendezvous """
         return self.updated + self.keep_alive
 
     def set_next_attempt(self, seconds):
@@ -437,7 +437,7 @@ class SyncQueue(models.Model):
     def increment_and_backoff_next_attempt(self):
         self.attempts += 1
         # exponential backoff with min of 30 seconds
-        self.set_next_attempt(28 + 2**self.attempts)
+        self.set_next_attempt(28 + 2 ** self.attempts)
 
     # Saving these models seems unusually prone to hitting database locks, so we'll retry
     # the save operation if we hit a lock.

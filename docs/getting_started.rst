@@ -66,37 +66,52 @@ Finally, add the Learning Equality repo as a remote called `upstream`. That way 
   git checkout -t upstream/develop # Checkout the development branch
 
 
-Python and uv
-~~~~~~~~~~~~~
+Python and Pip
+~~~~~~~~~~~~~~
 
-Kolibri uses `uv <https://docs.astral.sh/uv/>`__ to manage Python versions and virtual environments. Install uv following the `official installation guide <https://docs.astral.sh/uv/getting-started/installation/>`__.
+To develop on Kolibri, you'll need:
 
-uv will automatically install the correct Python version when you set up the project — you do not need to install Python separately or use pyenv.
+* Python 3.9 or higher (Note: Kolibri does not yet support Python 3.15 or above)
+* `pip <https://pypi.python.org/pypi/pip>`__
 
-.. note::
-  Direct development on Windows is not supported. If you're using a Windows machine, please set up your development environment using WSL (Windows Subsystem for Linux).
+Managing Python installations can be quite tricky. We *highly* recommend using `pyenv <https://github.com/pyenv/pyenv>`__ or if you are more comfortable using a package manager, then package managers like `Homebrew <http://brew.sh/>`__ on Mac or ``apt`` on Debian for this.
+
+To install pyenv see the detailed instructions here :doc:`/howtos/installing_pyenv`.
+..note::
+  If you are using a package manager, make sure to install a Python version compatible with Kolibri (3.9 or above, but below 3.15). If you're using `pyenv`, you can install it with a command like `pyenv install 3.9.9`.
+
+.. warning::
+  Never modify your system's built-in version of Python
 
 Python virtual environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-uv automatically creates and manages a virtual environment in the ``.venv`` directory. Set up the project:
+You should use a Python virtual environment to isolate the dependencies of your Python projects from each other and to avoid corrupting your system's Python installation.
+
+There are many ways to set up Python virtual environments: You can use `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`__ as shown in the instructions below; you can also use `Virtualenv <https://virtualenv.pypa.io/en/latest/>`__, `Virtualenvwrapper <https://virtualenvwrapper.readthedocs.io/en/latest/>`__ `Pipenv <https://pipenv.readthedocs.io/en/latest/>`__, `Python 3 venv <https://docs.python.org/3/library/venv.html>`__, `Poetry <https://poetry.eustace.io>`__ etc.
+
+.. note::
+  Most virtual environments will require special setup for non-Bash shells such as Fish and ZSH.
+ Direct development on Windows is not supported. If you're using a Windows machine, please set up your development environment using WSL (Windows Subsystem for Linux).
+
+To setup and start using pyenv-virtualenv, follow the instructions here :doc:`/howtos/pyenv_virtualenv`.
+
+Once pyenv-virtualenv is installed, you can use the following commands to set up and use a virtual environment from within the Kolibri repo:
+
 
 .. code-block:: bash
 
-  uv sync --group dev          # Creates venv, installs Python, installs all dev deps
+  pyenv virtualenv 3.9.9 kolibri-py3.9  # can also make an environment for other Python versions, e.g. 3.10
+  pyenv activate kolibri-py3.9  # activates the virtual environment
 
-Your virtual environment is now ready. Use ``uv run`` to execute commands within it:
+Now, any commands you run will target your virtual environment rather than the global Python installation. To deactivate the virtualenv, simply run:
 
-.. code-block:: bash
-
-  uv run kolibri --version     # Run kolibri CLI
-  uv run pytest                # Run tests
-
-To activate the virtual environment in your shell (for interactive use):
 
 .. code-block:: bash
 
-  source .venv/bin/activate    # Linux/Mac
+  pyenv deactivate
+
+(Note that you'll want to leave it activated for the remainder of the setup process)
 
 .. warning::
   Never install project dependencies using ``sudo pip install ...``
@@ -135,11 +150,20 @@ There are two environment variables you should plan to set:
 Install Python dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Python dependencies are installed automatically by ``uv sync --group dev`` above. To update dependencies after pulling new changes:
+To install Kolibri project-specific dependencies make sure you're in the ``kolibri`` directory and your Python virtual environment is active. Then run:
 
 .. code-block:: bash
 
-  uv sync --group dev
+  # required
+  pip install -r requirements.txt --upgrade
+  pip install -r requirements/dev.txt --upgrade
+  pip install -e .
+
+  # optional
+  pip install -r requirements/test.txt --upgrade
+  pip install -r requirements/docs.txt --upgrade
+
+Note that the ``--upgrade`` flags above can usually be omitted to speed up the process.
 
 Install Node.js, pnpm and other dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -340,46 +364,46 @@ Or to check the formatting without writing changes, run:
 
   pnpm run lint-frontend
 
-The linting and formatting for the backend is handled using ``prek`` below.
+The linting and formatting for the backend is handled using ``pre-commit`` below.
 
 
 Pre-commit hooks
 ~~~~~~~~~~~~~~~~
 
-**It is strongly recommended to use pre-commit hooks** to ensure code quality and consistency before committing. The hooks are identical to the automated build checks run by CI in Pull Requests, so using them locally will help you catch issues early.
+**It is strongly recommended to use pre-commit hooks** to ensure code quality and consistency before committing. The pre-commit hooks are identical to the automated build checks run by CI in Pull Requests, so using them locally will help you catch issues early.
 
-`prek <https://github.com/pre-commit/prek>`__ (a faster drop-in replacement for pre-commit) is used to apply a full set of checks and formatting automatically each time that ``git commit`` runs. If there are errors, the Git commit is aborted and you are asked to fix the error and run ``git commit`` again.
+`pre-commit <http://pre-commit.com/>`__ is used to apply a full set of checks and formatting automatically each time that ``git commit`` runs. If there are errors, the Git commit is aborted and you are asked to fix the error and run ``git commit`` again.
 
-prek is already installed as a development dependency (via ``uv sync --group dev``), but you also need to enable it:
+Pre-commit is already installed as a development dependency, but you also need to enable it:
 
 .. code-block:: bash
 
-  prek install
+  pre-commit install
 
 .. important::
   **Always run this command after cloning the repository** to enable pre-commit hooks for your local development environment.
 
-To run all checks in the same way that they will be run on our Github CI servers, run:
+To run all pre-commit checks in the same way that they will be run on our Github CI servers, run:
 
 .. code-block:: bash
 
-  prek run --all-files
+  pre-commit run --all-files
 
 This is particularly useful to run before creating a pull request to ensure all files pass checks.
 
-.. tip:: As a convenience, many developers install linting and formatting plugins in their code editor (IDE). Installing ESLint, Prettier, and Ruff plugins in your editor will catch most (but not all) code-quality checks.
+.. tip:: As a convenience, many developers install linting and formatting plugins in their code editor (IDE). Installing ESLint, Prettier, Black, and Flake8 plugins in your editor will catch most (but not all) code-quality checks.
 
-.. tip:: prek can have issues running from alternative Git clients like GitUp. If you encounter problems while committing changes, run ``prek uninstall`` to disable hooks.
+.. tip:: Pre-commit can have issues running from alternative Git clients like GitUp. If you encounter problems while committing changes, run ``pre-commit uninstall`` to disable pre-commit.
 
-.. warning:: If you do not use prek or other linting tools, your code will likely fail our server-side checks and you will need to update the PR in order to get it merged.
+.. warning:: If you do not use pre-commit or other linting tools, your code will likely fail our server-side checks and you will need to update the PR in order to get it merged.
 
-Recommended workflow with prek
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Recommended workflow with pre-commit
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 1. Make code changes
 2. Stage your changes: ``git add <files>``
 3. Attempt commit: ``git commit -m "Your message"``
-4. If prek finds issues:
+4. If pre-commit finds issues:
 
    - Review the errors and warnings
    - Many formatting issues will be auto-fixed - just review and re-stage the changes
@@ -399,11 +423,12 @@ We have a large number of reusable patterns, conventions, and components built i
 Updating documentation
 ----------------------
 
-First, install the documentation dependencies:
+First, install some additional dependencies related to building documentation output:
 
 .. code-block:: bash
 
-  uv sync --group docs
+  pip install -r requirements/docs.txt
+  pip install -r requirements/build.txt
 
 To make changes to documentation, edit the ``rst`` files in the ``kolibri/docs`` directory and then run:
 
@@ -420,8 +445,6 @@ You can also run the auto-build for faster editing from the ``docs`` directory:
 
 Now you should be able to preview the docs at ``http://127.0.0.1:8888/``.
 
-
-.. _automated testing:
 
 Automated testing
 -----------------
@@ -457,13 +480,17 @@ For more advanced usage, logical operators can also be used in wrapped strings, 
 
   pytest kolibri/auth/test/test_permissions -k "MembershipPermissionsTestCase and test_admin_can_delete_membership"
 
-You can run tests for a specific Python version using:
+You can also use ``tox`` to setup a clean and disposable environment:
 
 .. code-block:: bash
 
-  uv run --python 3.9 pytest   # Runs tests with Python 3.9
+  tox -e py3.4  # Runs tests with Python 3.4
 
-CI runs tests across all supported Python versions automatically.
+To run Python tests for all environments, use simply ``tox``. This simulates what our CI also does on GitHub PRs.
+
+.. note::
+
+  ``tox`` reuses its environment when it is run again. If you add anything to the requirements, you will want to either delete the `.tox` directory, or run ``tox`` with the ``-r`` argument to recreate the environment
 
 
 Manual testing

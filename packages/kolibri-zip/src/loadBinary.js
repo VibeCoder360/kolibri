@@ -3,10 +3,8 @@
  */
 
 /**
- * Load a binary resource from `path` via XMLHttpRequest.
- * @param {string} path - The path to the resource to GET.
- * @returns {Promise<ArrayBuffer>} Resolves with the raw response, or rejects with an
- * error describing the failure.
+ * @param  {string} path    The path to the resource to GET.
+ * @return {Promise}
  */
 export default function (path) {
   return new Promise((resolve, reject) => {

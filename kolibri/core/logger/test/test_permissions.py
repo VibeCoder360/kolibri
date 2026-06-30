@@ -1,17 +1,15 @@
 """
 Permissions tests on the logging models.
 """
-
 import uuid
 
 from django.test import TestCase
-
-from kolibri.core.auth.test.helpers import create_dummy_facility_data
 
 from .factory_logger import ContentSessionLogFactory
 from .factory_logger import ContentSummaryLogFactory
 from .factory_logger import GenerateCSVLogRequestFactory
 from .factory_logger import UserSessionLogFactory
+from kolibri.core.auth.test.helpers import create_dummy_facility_data
 
 
 class ContentSessionLogPermissionsTestCase(TestCase):
@@ -156,7 +154,7 @@ class GenerateCSVLogRequestPermissionsTestCase(TestCase):
         )
 
     def test_facility_admin_and_superuser_generatecsvlogrequest_permissions(self):
-        """Facility admins and superusers can create, read, update, or delete CSV Log Requests"""
+        """ Facility admins and superusers can create, read, update, or delete CSV Log Requests """
         for user in [
             self.data["superuser"],
             self.data["facility_admin"],
@@ -167,7 +165,7 @@ class GenerateCSVLogRequestPermissionsTestCase(TestCase):
             self.assertTrue(user.can_delete(self.data["log_request"]))
 
     def test_facility_users_generatecsvlogrequest_permissions(self):
-        """Facility coaches and members cannot create, read, update, or delete CSV Log Requests"""
+        """ Facility coaches and members cannot create, read, update, or delete CSV Log Requests """
         for user in [
             self.data["facility_coach"],
             self.data["learners_one_group"][0][1],

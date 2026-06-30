@@ -1,5 +1,5 @@
 /**
- * @file Enforce line breaks style after opening and before closing block-level tags.
+ * @fileoverview Enforce line breaks style after opening and before closing block-level tags.
  * Vendored and modified from:
  * https://github.com/vuejs/eslint-plugin-vue/blob/9b55f3c18403b0a77808ba758ec3a8e72a884036/lib/rules/block-tag-newline.js
  */
@@ -8,9 +8,8 @@ const utils = require('eslint-plugin-vue/lib/utils');
 const kolibriUtils = require('../utils');
 
 /**
- * Count linebreaks in a string.
- * @param {string} text - The text to count linebreaks in.
- * @returns {number} The number of linebreaks.
+ * @param {string} text Source code as a string.
+ * @returns {number}
  */
 function getLinebreakCount(text) {
   return text.split(/\r\n|[\r\n\u2028\u2029]/gu).length - 1;
@@ -23,9 +22,7 @@ const beforeTextRegex = /^(\s(\r\n|[\r\n\u2028\u2029])|(\r\n|[\r\n\u2028\u2029])
 const emptyLines = 1;
 
 /**
- * Get a descriptive phrase for a count of linebreaks.
- * @param {number} lineBreaks - The number of line breaks.
- * @returns {string} Descriptive phrase for the count.
+ * @param {number} lineBreaks
  */
 function getPhrase(lineBreaks) {
   switch (lineBreaks) {
@@ -53,6 +50,7 @@ module.exports = {
       expectedClosingLinebreak: "Expected {{expected}} before '</{{tag}}>', but {{actual}} found.",
     },
   },
+  /** @param {RuleContext} context */
   create(context) {
     const parserServices = kolibriUtils.getParserServices(context);
     if (!parserServices || !parserServices.getDocumentFragment) {
@@ -66,10 +64,9 @@ module.exports = {
     const sourceCode = context.sourceCode;
 
     /**
-     * Verify the opening whitespace of a block element.
-     * @param {object} startTag - The start tag node.
-     * @param {string} beforeText - The whitespace text before the content.
-     * @param {number} beforeLinebreakCount - The number of linebreaks before content.
+     * @param {VStartTag} startTag
+     * @param {string} beforeText
+     * @param {number} beforeLinebreakCount
      * @returns {void}
      */
     function verifyBeforeSpaces(startTag, beforeText, beforeLinebreakCount) {
@@ -95,10 +92,9 @@ module.exports = {
       }
     }
     /**
-     * Verify the closing whitespace of a block element.
-     * @param {object} endTag - The end tag node.
-     * @param {string} afterText - The whitespace text after the content.
-     * @param {number} afterLinebreakCount - The number of linebreaks after content.
+     * @param {VEndTag} endTag
+     * @param {string} afterText
+     * @param {number} afterLinebreakCount
      * @returns {void}
      */
     function verifyAfterSpaces(endTag, afterText, afterLinebreakCount) {
@@ -124,8 +120,7 @@ module.exports = {
       }
     }
     /**
-     * Verify the whitespace padding of a Vue block element.
-     * @param {object} element - The Vue element AST node.
+     * @param {VElement} element
      * @returns {void}
      */
     function verifyElement(element) {
@@ -140,8 +135,8 @@ module.exports = {
         return;
       }
 
-      const beforeText = beforeTextRegex.exec(text)[0];
-      const afterText = /\s*$/u.exec(text)[0];
+      const beforeText = /** @type {RegExpExecArray} */ (beforeTextRegex.exec(text))[0];
+      const afterText = /** @type {RegExpExecArray} */ (/\s*$/u.exec(text))[0];
       const beforeLinebreakCount = getLinebreakCount(beforeText);
       const afterLinebreakCount = getLinebreakCount(afterText);
 
@@ -156,6 +151,7 @@ module.exports = {
       context,
       {},
       {
+        /** @param {Program} node */
         Program(node) {
           if (utils.hasInvalidEOF(node)) {
             return;

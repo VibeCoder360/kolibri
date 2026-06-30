@@ -1,4 +1,3 @@
 .. _changelog:
 
-.. include:: ../CHANGELOG.md
-   :parser: myst_parser.sphinx_
+.. mdinclude:: ../CHANGELOG.md

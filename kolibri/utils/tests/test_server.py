@@ -1,7 +1,6 @@
 """
 Tests for `kolibri.utils.server` module.
 """
-
 import os
 from unittest import TestCase
 
@@ -109,6 +108,7 @@ class TestServerServices:
         mock_kolibri_broadcast.assert_not_called()
 
     def test_services_shutdown_on_stop(self):
+
         # Initialize and ready services plugin for testing
         services_plugin = server.ServicesPlugin(mock.MagicMock(name="bus"))
 
@@ -135,10 +135,10 @@ class TestServerDefaultScheduledTasks:
         job_storage,
     ):
         with mock.patch("kolibri.core.tasks.registry.job_storage", wraps=job_storage):
-            # Schedule two userdefined jobs
-            from datetime import timedelta
 
+            # Schedule two userdefined jobs
             from kolibri.utils.time_utils import local_now
+            from datetime import timedelta
 
             schedule_time = local_now() + timedelta(hours=1)
             test1 = job_storage.schedule(schedule_time, Job(id))
@@ -188,6 +188,7 @@ class TestZeroConfPlugin:
     def test_required_services_initiate_on_start(
         self, mock_kolibri_broadcast, mock_build_instance, *args
     ):
+
         # Start zeroconf services
         zeroconf_plugin = server.ZeroConfPlugin(mock.MagicMock(name="bus"), 1234)
         zeroconf_plugin.START()

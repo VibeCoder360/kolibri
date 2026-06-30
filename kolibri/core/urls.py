@@ -30,14 +30,9 @@ Plugin classes can define url modules, and they will automatically be included.
 Place a url.py and have your plugin's definition class's ``url_module`` method
 return the module.
 """
-
 from django.urls import include
 from django.urls import re_path
 from rest_framework import routers
-
-from kolibri.core.device.translation import i18n_patterns
-from kolibri.core.device.viewsets.plugins import PluginsViewSet
-from kolibri.plugins.utils.urls import get_urls as plugin_urls
 
 from .views import GuestRedirectView
 from .views import logout_view
@@ -45,6 +40,9 @@ from .views import RootURLRedirectView
 from .views import set_language
 from .views import StatusCheckView
 from .views import UnsupportedBrowserView
+from kolibri.core.device.api import PluginsViewSet
+from kolibri.core.device.translation import i18n_patterns
+from kolibri.plugins.utils.urls import get_urls as plugin_urls
 
 app_name = "kolibri"
 

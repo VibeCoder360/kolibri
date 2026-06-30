@@ -1,13 +1,12 @@
-from kolibri.core.auth.hooks import FacilityDataSyncHook
-from kolibri.core.auth.sync_operations import KolibriSingleUserSyncOperation
-from kolibri.plugins.hooks import register_hook
-
 from .single_user_assignment_utils import (
     update_assignments_from_individual_syncable_lessons,
 )
 from .single_user_assignment_utils import (
     update_individual_syncable_lessons_from_assignments,
 )
+from kolibri.core.auth.hooks import FacilityDataSyncHook
+from kolibri.core.auth.sync_operations import KolibriSingleUserSyncOperation
+from kolibri.plugins.hooks import register_hook
 
 
 class SingleUserLessonSerializeOperation(KolibriSingleUserSyncOperation):

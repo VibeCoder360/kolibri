@@ -33,7 +33,5 @@ export default (widget, rubric) => {
     }
   }
 
-  widget.props.handleUserInput({
-    currentValue: value.toString(),
-  });
+  widget.setInputValue('', value.toString());
 };

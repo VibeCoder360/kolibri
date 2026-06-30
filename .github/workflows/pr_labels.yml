@@ -1,10 +1,11 @@
 name: PR Labels
-# Disabled on school fork — uses LE Bot token for label management. See SCHOOL_FORK_CHANGES.md.
-on:
-  workflow_dispatch:
+
+on: [pull_request_target]
+
 permissions:
   contents: read
   pull-requests: write
+
 jobs:
   size-labels:
     runs-on: ubuntu-latest
@@ -29,6 +30,6 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/labeler@v6
-        with:
-          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+    - uses: actions/labeler@v6
+      with:
+        repo-token: "${{ secrets.GITHUB_TOKEN }}"
