@@ -5,18 +5,13 @@ import getUrlParameter from '../views/getUrlParameter';
 import useAuthFlow from './useAuthFlow';
 
 /**
- * @typedef {object} UseAuthRouterReturn
- * @property {import('vue').ComputedRef<object>} signInRoute - The route for the active sign-in
- * method.
- * @property {import('vue').ComputedRef<object>} defaultRoute - The route to use when none has been
- * specified.
- * @property {import('vue').ComputedRef<object>} pictureSignInRoute - The picture-password sign-in
- * route.
- * @property {import('vue').ComputedRef<object>} usernameSignInRoute - The username/password sign-in
- * route.
- * @property {import('vue').ComputedRef<object>} signUpRoute - The route to the new-account form.
- * @property {(signUpNext: boolean) => object} getFacilitySelectionRoute - Builds the
- * facility-selection route.
+ * @typedef {Object} UseAuthRouterReturn
+ * @property {import('vue').ComputedRef<object>} signInRoute
+ * @property {import('vue').ComputedRef<object>} defaultRoute
+ * @property {import('vue').ComputedRef<object>} pictureSignInRoute
+ * @property {import('vue').ComputedRef<object>} usernameSignInRoute
+ * @property {import('vue').ComputedRef<object>} signUpRoute
+ * @property {function(boolean): {}} getFacilitySelectionRoute
  */
 
 const { facilityId, hasMultipleFacilities, signInMethod } = useAuthFlow();
@@ -47,8 +42,9 @@ const defaultRouteName = computed(() => {
  * Routing helpers for authentication flow, which requires a route to be injected in order to
  * allow this composable to be used outside of components and to extract the next step from
  * the route query.
- * @param {import('vue-router').Route} route - The component's route or a destination route.
- * @returns {UseAuthRouterReturn} The authentication routing helpers and computed routes.
+ *
+ * @param {import('vue-router').Route} route The component's route or a destination route
+ * @return {UseAuthRouterReturn}
  */
 export default function useAuthRouter(route) {
   const _route = computed(() => route);
@@ -84,18 +80,16 @@ export default function useAuthRouter(route) {
 
   /**
    * Gets the facility selection route, with the next step route and carries over the next URI
-   * @param {boolean} signUpNext - Whether facility selection should lead into the sign-up flow.
-   * @returns {{name: string, params: {signUpNext: boolean}, query: object}} The facility-selection
-   * route descriptor.
+   * @param {boolean} signUpNext
+   * @return {{name: string, params: {signUpNext: boolean}, query: {next: string}|{}}}
    */
   function getFacilitySelectionRoute(signUpNext) {
     return router.getRoute(ComponentMap.FACILITY_SELECT, { signUpNext }, nextQuery.value);
   }
 
   /**
-   * Builds a sign-in route for the given component name, carrying over the next URI.
-   * @param {string} name - The route/component name to navigate to.
-   * @returns {{name: string, query: object}} The sign-in route descriptor.
+   * @param {string} name
+   * @return {{name: string, query: Object}}
    */
   function getSignInRoute(name) {
     return router.getRoute(name, {}, nextQuery.value);
@@ -119,6 +113,11 @@ export default function useAuthRouter(route) {
   /**
    * @type {import('vue').ComputedRef<object>}
    */
+  const qrSignInRoute = computed(() => getSignInRoute(ComponentMap.QR_SIGN_IN));
+
+  /**
+   * @type {import('vue').ComputedRef<object>}
+   */
   const signUpRoute = computed(() => getSignInRoute(ComponentMap.SIGN_UP));
 
   return {
@@ -130,6 +129,7 @@ export default function useAuthRouter(route) {
     signInRoute,
     pictureSignInRoute,
     usernameSignInRoute,
+    qrSignInRoute,
     signUpRoute,
     getFacilitySelectionRoute,
     getSignInRoute,

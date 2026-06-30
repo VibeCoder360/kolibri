@@ -6,6 +6,7 @@ import AuthSelect from './views/AuthSelect';
 import FacilitySelect from './views/FacilitySelect';
 import SignInPage from './views/SignInPage';
 import PictureSignInPage from './views/SignInPage/PictureSignInPage.vue';
+import QRSignInPage from './views/SignInPage/QRSignInPage.vue';
 import SignUpPage from './views/SignUpPage';
 import NewPasswordPage from './views/SignInPage/NewPasswordPage';
 import useAuthFlow from './composables/useAuthFlow';
@@ -50,6 +51,13 @@ export default [
     component: PictureSignInPage,
     async beforeEnter(to, from, next) {
       await signInHook(OptionsForSignIn.PICTURE_PASSWORD, to, from, next);
+    },
+  },
+  {
+    path: '/qr-signin',
+    component: QRSignInPage,
+    async beforeEnter(to, from, next) {
+      await signInHook(OptionsForSignIn.QR_LOGIN, to, from, next);
     },
   },
   {
