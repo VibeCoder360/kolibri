@@ -131,15 +131,23 @@
             <th>{{ myQRCode$() }}</th>
             <td>
               <UserQRCode
-                v-if="currentUser.qr_login_token"
+                v-if="qrLoginToken"
                 data-testid="qr-login-token-display"
-                :token="currentUser.qr_login_token"
+                :token="qrLoginToken"
                 :size="120"
               />
-              <KEmptyPlaceholder
-                v-else
-                data-testid="qr-login-token-empty"
-              />
+              <template v-else>
+                <KEmptyPlaceholder data-testid="qr-login-token-empty" />
+                <div>
+                  <KButton
+                    appearance="basic-link"
+                    data-testid="generate-qr-token"
+                    :text="generateQrCode$()"
+                    :disabled="assigningQrToken"
+                    @click="handleGenerateQrToken"
+                  />
+                </div>
+              </template>
             </td>
           </tr>
 
@@ -235,6 +243,8 @@
   import useTotalProgress from 'kolibri/composables/useTotalProgress';
   import useFacilities from 'kolibri-common/composables/useFacilities';
   import useFacility from 'kolibri-common/composables/useFacility';
+  import useSnackbar from 'kolibri/composables/useSnackbar';
+  import FacilityUserResource from 'kolibri-common/apiResources/FacilityUserResource';
   import { qrLoginStrings } from 'kolibri-common/strings/qrLoginStrings';
   import { pageLoading } from 'kolibri-common/composables/usePageLoading';
   import { RoutesMap } from '../../constants';
@@ -280,9 +290,35 @@
       const { facilities } = useFacilities();
       const { facilityConfig, fetchFacilities, updateFacilityConfig } = useFacility();
       const userPermissions = computed(() => pickBy(_userPermissions.value));
-      const { myQRCode$ } = qrLoginStrings;
+      const { createSnackbar } = useSnackbar();
+      const { myQRCode$, generateQrCode$, qrTokenOperationFailed$ } = qrLoginStrings;
+
+      // Any user (including coaches, admins, and super admins) can generate a
+      // QR login token for themselves. Learners usually already have one
+      // assigned automatically.
+      const assigningQrToken = ref(false);
+      const generatedQrToken = ref(null);
+      const qrLoginToken = computed(
+        () => currentUser.value?.qr_login_token || generatedQrToken.value,
+      );
+
+      async function handleGenerateQrToken() {
+        assigningQrToken.value = true;
+        try {
+          const { data } = await FacilityUserResource.assignQrToken(currentUser.value.id);
+          generatedQrToken.value = data.qr_login_token;
+        } catch (err) {
+          createSnackbar(qrTokenOperationFailed$());
+        } finally {
+          assigningQrToken.value = false;
+        }
+      }
 
       return {
+        assigningQrToken,
+        qrLoginToken,
+        handleGenerateQrToken,
+        generateQrCode$,
         pageLoading,
         currentUser,
         onMyOwnSetup,
@@ -341,13 +377,9 @@
         return this.userKind === UserKinds.LEARNER;
       },
       showQrLoginRow() {
-        if (!this.facilityConfig?.enable_qr_login) {
-          return false;
-        }
-        if (this.isSuperuser && this.isLearnerOnlyImport) {
-          return true;
-        }
-        return this.userKind === UserKinds.LEARNER;
+        // Unlike picture passwords, QR login is available to every user kind:
+        // coaches, admins, and super admins can generate a code for themselves.
+        return Boolean(this.facilityConfig?.enable_qr_login);
       },
       canEditPassword() {
         const learner_can_edit =

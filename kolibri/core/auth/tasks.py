@@ -892,8 +892,8 @@ def assign_qr_login_tokens_to_facility(facility_id, user_ids=None):
         job.update_progress(0, total)
 
     for i, learner in enumerate(learners.iterator(), start=1):
-        # assign_qr_login_token is a no-op for ineligible users (defensive),
-        # but the queryset above already filters to eligible learners.
+        # Bulk assignment stays learner-only (see queryset above); coaches,
+        # admins, and superusers opt in individually via assign_qr_token.
         assign_qr_login_token(learner)
         if job:
             job.update_progress(i, total)

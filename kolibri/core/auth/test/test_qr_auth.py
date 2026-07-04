@@ -88,27 +88,18 @@ class QRTokenAuthScopeTestCase(TestCase):
         auth_scope = QRTokenAuthScope(self.facility, self.learner.qr_login_token)
         self.assertFalse(auth_scope.matches_credentials(self.learner))
 
-    def test_matches_credentials_returns_false_for_coach(self):
+    def test_matches_credentials_returns_true_for_coach(self):
         coach = FacilityUser.objects.create(username="coach", facility=self.facility)
         coach.qr_login_token = "c" * 43
         coach.save(update_fields=["qr_login_token"])
         self.facility.add_coach(coach)
 
         auth_scope = QRTokenAuthScope(self.facility, coach.qr_login_token)
-        self.assertFalse(auth_scope.matches_credentials(_set_has_roles(coach)))
+        self.assertTrue(auth_scope.matches_credentials(_set_has_roles(coach)))
 
-    def test_matches_credentials_returns_false_for_superuser_when_full_import(self):
+    def test_matches_credentials_returns_true_for_superuser(self):
         superuser = create_superuser(self.facility, username="superuser")
         superuser.qr_login_token = "d" * 43
-        superuser.save(update_fields=["qr_login_token"])
-
-        auth_scope = QRTokenAuthScope(self.facility, superuser.qr_login_token)
-        self.assertFalse(auth_scope.matches_credentials(_set_has_roles(superuser)))
-
-    def test_matches_credentials_returns_true_for_superuser_when_single_user(self):
-        self.is_full_facility_import.return_value = False
-        superuser = create_superuser(self.facility, username="single_superuser")
-        superuser.qr_login_token = "e" * 43
         superuser.save(update_fields=["qr_login_token"])
 
         auth_scope = QRTokenAuthScope(self.facility, superuser.qr_login_token)
@@ -188,12 +179,9 @@ class QRLoginSessionTestCase(APITestCase):
         self.assertEqual(response.data[0]["id"], error_constants.NOT_FOUND)
         self.assertEqual(response.data[0]["metadata"]["field"], "qr_login_token")
 
-    def test_coach_not_authenticated_via_qr_token(self):
+    def test_coach_authenticated_via_qr_token(self):
         coach = FacilityUserFactory.create(facility=self.facility)
         self.facility.add_coach(coach)
-        # Re-assign a token directly to test defence-in-depth: even if a coach
-        # somehow has a qr_login_token, matches_credentials must reject them.
-        # (Role.save normally clears the token; we bypass that here.)
         coach.qr_login_token = "c" * 43
         coach.save(update_fields=["qr_login_token"])
         response = self.client.post(
@@ -204,9 +192,8 @@ class QRLoginSessionTestCase(APITestCase):
             },
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIsInstance(response.data, list)
-        self.assertEqual(response.data[0]["id"], error_constants.NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["user_id"], coach.id)
 
     def test_qr_token_wrong_facility_returns_not_found(self):
         response = self.client.post(

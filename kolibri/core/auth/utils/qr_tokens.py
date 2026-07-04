@@ -18,33 +18,21 @@ def generate_qr_login_token():
     return secrets.token_urlsafe(32)
 
 
-def _is_eligible_for_qr_login(user):
-    """
-    A user is eligible for a QR login token only if they are a learner
-    (no roles) and not a superuser. Mirrors the picture password eligibility
-    rule used by `PicturePasswordAuthScope.matches_credentials`.
-    """
-    if user.is_superuser:
-        return False
-    return not user.roles.exists()
-
-
 def assign_qr_login_token(user):
     """
-    Assign a unique QR login token to the user if they are eligible and don't
-    already have one.
+    Assign a unique QR login token to the user if they don't already have one.
+
+    Any facility user may hold a QR login token — learners are assigned one
+    automatically (by sync hooks and facility tasks), while coaches, admins,
+    and superusers opt in explicitly via the assign/rotate API actions.
 
     Handles IntegrityError (race condition where another request assigned the
     same token between our read and write, or a sync collision) by retrying
     once with a fresh token.
 
     :param user: A FacilityUser instance
-    :return: True if a token was assigned (or was already present and the user
-             is eligible); False if the user is not eligible.
+    :return: True if a token was assigned (or was already present).
     """
-    if not _is_eligible_for_qr_login(user):
-        return False
-
     if user.qr_login_token is not None:
         return True
 
@@ -71,15 +59,8 @@ def reassign_qr_login_token(user):
     immediately.
 
     :param user: A FacilityUser instance
-    :return: True if a new token was assigned; False if the user is not
-             eligible (in which case any existing token is cleared).
+    :return: True if a new token was assigned.
     """
-    if not _is_eligible_for_qr_login(user):
-        if user.qr_login_token is not None:
-            user.qr_login_token = None
-            user.save(update_fields=["qr_login_token"])
-        return False
-
     user.qr_login_token = generate_qr_login_token()
     try:
         user.save(update_fields=["qr_login_token"])
@@ -92,7 +73,8 @@ def reassign_qr_login_token(user):
 
 def clear_qr_login_token(user):
     """
-    Remove the user's QR login token (e.g. when they are promoted to a role).
+    Remove the user's QR login token (e.g. when QR login is disabled for the
+    facility, or an admin revokes a user's card without issuing a new one).
     """
     if user.qr_login_token is None:
         return

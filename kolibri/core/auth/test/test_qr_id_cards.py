@@ -207,7 +207,7 @@ class RotateQRTokenTestCase(APITestCase):
         )
         self.assertEqual(new_response.status_code, status.HTTP_200_OK)
 
-    def test_learner_cannot_rotate_own_token(self):
+    def test_learner_can_rotate_own_token(self):
         learner_client = self.client_class()
         learner_client.login(
             username=self.learner.username,
@@ -215,10 +215,40 @@ class RotateQRTokenTestCase(APITestCase):
             facility=self.facility,
         )
         response = learner_client.post(self._rotate_url(self.learner.id), format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.learner.refresh_from_db()
+        self.assertNotEqual(self.learner.qr_login_token, self.original_token)
+
+    def test_learner_cannot_rotate_another_users_token(self):
+        other = FacilityUserFactory.create(facility=self.facility)
+        learner_client = self.client_class()
+        learner_client.login(
+            username=self.learner.username,
+            password=DUMMY_PASSWORD,
+            facility=self.facility,
+        )
+        response = learner_client.post(self._rotate_url(other.id), format="json")
         self.assertIn(
             response.status_code,
             (status.HTTP_403_FORBIDDEN, status.HTTP_401_UNAUTHORIZED),
         )
+
+    def test_coach_can_rotate_own_token(self):
+        coach = FacilityUserFactory.create(facility=self.facility)
+        self.facility.add_coach(coach)
+        coach.qr_login_token = "c" * 43
+        coach.save(update_fields=["qr_login_token"])
+        coach_client = self.client_class()
+        coach_client.login(
+            username=coach.username,
+            password=DUMMY_PASSWORD,
+            facility=self.facility,
+        )
+        response = coach_client.post(self._rotate_url(coach.id), format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        coach.refresh_from_db()
+        self.assertIsNotNone(coach.qr_login_token)
+        self.assertNotEqual(coach.qr_login_token, "c" * 43)
 
     def test_rotate_assigns_new_eligible_token(self):
         response = self.client.post(self._rotate_url(self.learner.id), format="json")
@@ -227,7 +257,7 @@ class RotateQRTokenTestCase(APITestCase):
         self.assertGreaterEqual(len(self.learner.qr_login_token), 16)
         self.assertLessEqual(len(self.learner.qr_login_token), 64)
 
-    def test_rotate_on_coach_clears_token(self):
+    def test_admin_can_rotate_coach_token(self):
         coach = FacilityUserFactory.create(facility=self.facility)
         self.facility.add_coach(coach)
         coach.qr_login_token = "c" * 43
@@ -236,7 +266,8 @@ class RotateQRTokenTestCase(APITestCase):
         response = self.client.post(self._rotate_url(coach.id), format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         coach.refresh_from_db()
-        self.assertIsNone(coach.qr_login_token)
+        self.assertIsNotNone(coach.qr_login_token)
+        self.assertNotEqual(coach.qr_login_token, "c" * 43)
 
     def test_rotate_produces_token_unique_within_facility(self):
         # Give several other learners distinct, pre-existing tokens so we can
@@ -331,7 +362,7 @@ class AssignQRTokenTestCase(APITestCase):
         self.assertEqual(self.learner.qr_login_token, existing_token)
         self.assertEqual(response.data["qr_login_token"], existing_token)
 
-    def test_learner_cannot_assign_own_token(self):
+    def test_learner_can_assign_own_token(self):
         self.learner.qr_login_token = None
         self.learner.save(update_fields=["qr_login_token"])
 
@@ -342,14 +373,27 @@ class AssignQRTokenTestCase(APITestCase):
             facility=self.facility,
         )
         response = learner_client.post(self._assign_url(self.learner.id), format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.learner.refresh_from_db()
+        self.assertIsNotNone(self.learner.qr_login_token)
+
+    def test_learner_cannot_assign_token_to_another_user(self):
+        other = FacilityUserFactory.create(facility=self.facility)
+        learner_client = self.client_class()
+        learner_client.login(
+            username=self.learner.username,
+            password=DUMMY_PASSWORD,
+            facility=self.facility,
+        )
+        response = learner_client.post(self._assign_url(other.id), format="json")
         self.assertIn(
             response.status_code,
             (status.HTTP_403_FORBIDDEN, status.HTTP_401_UNAUTHORIZED),
         )
-        self.learner.refresh_from_db()
-        self.assertIsNone(self.learner.qr_login_token)
+        other.refresh_from_db()
+        self.assertIsNone(other.qr_login_token)
 
-    def test_assign_on_coach_does_not_assign(self):
+    def test_admin_can_assign_token_to_coach(self):
         coach = FacilityUserFactory.create(facility=self.facility)
         self.facility.add_coach(coach)
         self.assertIsNone(coach.qr_login_token)
@@ -357,8 +401,36 @@ class AssignQRTokenTestCase(APITestCase):
         response = self.client.post(self._assign_url(coach.id), format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         coach.refresh_from_db()
-        # Coaches are ineligible; no token is ever assigned.
-        self.assertIsNone(coach.qr_login_token)
+        self.assertIsNotNone(coach.qr_login_token)
+
+    def test_coach_can_assign_own_token(self):
+        coach = FacilityUserFactory.create(facility=self.facility)
+        self.facility.add_coach(coach)
+        coach_client = self.client_class()
+        coach_client.login(
+            username=coach.username,
+            password=DUMMY_PASSWORD,
+            facility=self.facility,
+        )
+        response = coach_client.post(self._assign_url(coach.id), format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        coach.refresh_from_db()
+        self.assertIsNotNone(coach.qr_login_token)
+
+    def test_superuser_can_assign_own_token(self):
+        from .helpers import create_superuser
+
+        superuser = create_superuser(self.facility)
+        su_client = self.client_class()
+        su_client.login(
+            username=superuser.username,
+            password=DUMMY_PASSWORD,
+            facility=self.facility,
+        )
+        response = su_client.post(self._assign_url(superuser.id), format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        superuser.refresh_from_db()
+        self.assertIsNotNone(superuser.qr_login_token)
 
 
 class ProfileImageOnCreateTestCase(APITestCase):

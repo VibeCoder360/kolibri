@@ -120,6 +120,9 @@ class SaveFacilityLoginSettingsQRTestCase(APITestCase):
     @patch("kolibri.core.auth.api.assign_qr_login_tokens_to_facility")
     @patch("kolibri.core.auth.api.job_storage")
     def test_enable_qr_login_enqueues_task(self, mock_storage, mock_task):
+        # enable_qr_login defaults to True; the task only enqueues on a
+        # disabled -> enabled transition, so start from disabled.
+        disable_qr_login(self.facility)
         self._setup_task_mocks(mock_storage, mock_task)
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
         response = self.client.patch(
@@ -292,11 +295,12 @@ class RoleViewSetQRTokenTestCase(APITestCase):
             facility=self.facility,
         )
 
-    def test_creating_role_clears_qr_login_token(self):
+    def test_creating_role_keeps_qr_login_token(self):
+        # Coaches and admins may hold QR login tokens, so promoting a learner
+        # via the API must not invalidate their card.
         learner = FacilityUserFactory.create(facility=self.facility)
         learner.qr_login_token = "a" * 43
         learner.save(update_fields=["qr_login_token"])
-        self.assertIsNotNone(learner.qr_login_token)
 
         url = reverse("kolibri:core:role-list")
         response = self.client.post(
@@ -310,9 +314,9 @@ class RoleViewSetQRTokenTestCase(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         learner.refresh_from_db()
-        self.assertIsNone(learner.qr_login_token)
+        self.assertEqual(learner.qr_login_token, "a" * 43)
 
-    def test_bulk_role_creation_clears_qr_login_token(self):
+    def test_bulk_role_creation_keeps_qr_login_token(self):
         learner1 = FacilityUserFactory.create(facility=self.facility)
         learner1.qr_login_token = "b" * 43
         learner1.save(update_fields=["qr_login_token"])
@@ -340,5 +344,5 @@ class RoleViewSetQRTokenTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         learner1.refresh_from_db()
         learner2.refresh_from_db()
-        self.assertIsNone(learner1.qr_login_token)
-        self.assertIsNone(learner2.qr_login_token)
+        self.assertEqual(learner1.qr_login_token, "b" * 43)
+        self.assertEqual(learner2.qr_login_token, "c" * 43)

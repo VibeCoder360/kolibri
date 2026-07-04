@@ -216,14 +216,13 @@ class QRTokenAuthScope(FacilityAuthScope):
 
     def matches_credentials(self, user):
         """
-        Validates that the user's facility has QR login enabled and that the
-        user is still an eligible learner.
+        Validates that the user's facility has QR login enabled. Unlike
+        picture passwords, QR tokens are not learner-only: coaches, admins,
+        and superusers may hold one, but only by explicit opt-in via the ID
+        cards API (learners are the only users assigned tokens
+        automatically), so no role or superuser check is applied here.
         """
-        return (
-            user.dataset.enable_qr_login
-            and not user.has_roles
-            and (not user.is_superuser or self.is_full_facility_import)
-        )
+        return user.dataset.enable_qr_login
 
 
 class FacilityUserBackend:

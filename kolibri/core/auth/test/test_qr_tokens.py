@@ -54,17 +54,17 @@ class AssignQRLoginTokenTestCase(TestCase):
         self.learner.refresh_from_db()
         self.assertEqual(self.learner.qr_login_token, first_token)
 
-    def test_noop_for_coach(self):
+    def test_assigns_token_to_coach(self):
         result = assign_qr_login_token(self.coach)
-        self.assertFalse(result)
+        self.assertTrue(result)
         self.coach.refresh_from_db()
-        self.assertIsNone(self.coach.qr_login_token)
+        self.assertIsNotNone(self.coach.qr_login_token)
 
-    def test_noop_for_superuser(self):
+    def test_assigns_token_to_superuser(self):
         result = assign_qr_login_token(self.superuser)
-        self.assertFalse(result)
+        self.assertTrue(result)
         self.superuser.refresh_from_db()
-        self.assertIsNone(self.superuser.qr_login_token)
+        self.assertIsNotNone(self.superuser.qr_login_token)
 
 
 class ReassignQRLoginTokenTestCase(TestCase):
@@ -92,19 +92,21 @@ class ReassignQRLoginTokenTestCase(TestCase):
         self.learner.refresh_from_db()
         self.assertIsNotNone(self.learner.qr_login_token)
 
-    def test_clears_token_for_ineligible_user(self):
+    def test_replaces_token_for_coach(self):
         coach = FacilityUser.objects.create(
             username="promoted_coach", facility=self.facility
         )
         self.facility.add_coach(coach)
-        coach.qr_login_token = generate_qr_login_token()
+        original = generate_qr_login_token()
+        coach.qr_login_token = original
         coach.save(update_fields=["qr_login_token"])
 
         result = reassign_qr_login_token(coach)
 
-        self.assertFalse(result)
+        self.assertTrue(result)
         coach.refresh_from_db()
-        self.assertIsNone(coach.qr_login_token)
+        self.assertIsNotNone(coach.qr_login_token)
+        self.assertNotEqual(coach.qr_login_token, original)
 
     def test_reassign_token_does_not_collide_with_other_users(self):
         # Populate several other users with distinct tokens.

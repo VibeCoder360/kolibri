@@ -771,31 +771,40 @@ class FacilityUserViewSet(FacilityUserConsolidateMixin, ValuesViewset, BulkDelet
     def rotate_qr_token(self, request, pk):
         """
         Generates a new QR login token for the user, invalidating any
-        previously-printed card. Only facility admins can call this;
-        learners cannot rotate their own tokens.
+        previously-printed card. Facility admins can rotate any user's token;
+        any user can rotate their own (e.g. a coach regenerating their
+        own card).
         """
         user = get_object_or_404(FacilityUser, pk=pk)
         if not (
-            request.user.is_superuser
+            request.user == user
+            or request.user.is_superuser
             or request.user.has_role_for_collection(role_kinds.ADMIN, user.facility)
         ):
-            raise PermissionDenied("Only facility admins can rotate QR tokens.")
+            raise PermissionDenied(
+                "Only facility admins can rotate other users' QR tokens."
+            )
         reassign_qr_login_token(user)
         return Response({"qr_login_token": user.qr_login_token})
 
     @decorators.action(detail=True, methods=["post"])
     def assign_qr_token(self, request, pk):
         """
-        Assigns a QR login token to the user if they are eligible and don't
+        Assigns a QR login token to the user if they don't
         already have one. Idempotent: a no-op (returning the existing token)
-        if the user already has one. Only facility admins can call this.
+        if the user already has one. Facility admins can assign to any user;
+        any user can assign a token to themselves (e.g. a coach or admin
+        generating their own card).
         """
         user = get_object_or_404(FacilityUser, pk=pk)
         if not (
-            request.user.is_superuser
+            request.user == user
+            or request.user.is_superuser
             or request.user.has_role_for_collection(role_kinds.ADMIN, user.facility)
         ):
-            raise PermissionDenied("Only facility admins can assign QR tokens.")
+            raise PermissionDenied(
+                "Only facility admins can assign QR tokens to other users."
+            )
         assign_qr_login_token(user)
         return Response({"qr_login_token": user.qr_login_token})
 
@@ -1034,19 +1043,15 @@ class RoleViewSet(BulkDeleteMixin, BulkCreateMixin, viewsets.ModelViewSet):
             if not isinstance(instances, list):
                 instances = [instances]
             user_ids = [role.user_id for role in instances]
-            affected_users = FacilityUser.objects.filter(id__in=user_ids,).filter(
-                Q(picture_password__isnull=False) | Q(qr_login_token__isnull=False)
+            # Picture passwords are learner-only, so clear them on promotion.
+            # QR login tokens are deliberately kept: coaches and admins may
+            # hold a QR token too, so a promoted learner keeps their card.
+            affected_users = FacilityUser.objects.filter(
+                id__in=user_ids, picture_password__isnull=False
             )
             for user in affected_users:
-                cleared = False
-                if user.picture_password is not None:
-                    user.picture_password = None
-                    cleared = True
-                if user.qr_login_token is not None:
-                    user.qr_login_token = None
-                    cleared = True
-                if cleared:
-                    user.save(update_fields=["picture_password", "qr_login_token"])
+                user.picture_password = None
+                user.save(update_fields=["picture_password"])
 
 
 dataset_keys = [
@@ -1569,7 +1574,7 @@ class CreateSessionSerializer(serializers.Serializer):
                             "id": error_constants.NOT_FOUND,
                             "metadata": {
                                 "field": "qr_login_token",
-                                "message": "No learner found with that QR code.",
+                                "message": "No user found with that QR code.",
                             },
                         }
                     ]

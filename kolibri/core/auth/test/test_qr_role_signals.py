@@ -10,12 +10,14 @@ from .helpers import disable_qr_login
 from .helpers import enable_qr_login
 
 
-class RoleSaveClearsQRLoginTokenTestCase(TestCase):
+class RoleSaveKeepsQRLoginTokenTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.facility = Facility.objects.create(name="RoleSaveQRFacility")
 
-    def test_creating_role_clears_existing_qr_login_token(self):
+    def test_creating_role_keeps_existing_qr_login_token(self):
+        # Coaches and admins may hold QR login tokens, so promoting a learner
+        # must not invalidate their card.
         learner = FacilityUser.objects.create(
             username="learner", facility=self.facility
         )
@@ -29,7 +31,7 @@ class RoleSaveClearsQRLoginTokenTestCase(TestCase):
         )
 
         learner.refresh_from_db()
-        self.assertIsNone(learner.qr_login_token)
+        self.assertEqual(learner.qr_login_token, "a" * 43)
 
 
 class RoleDeleteReassignsQRLoginTokenTestCase(TestCase):
@@ -38,26 +40,20 @@ class RoleDeleteReassignsQRLoginTokenTestCase(TestCase):
         cls.facility = Facility.objects.create(name="RoleDeleteQRFacility")
         enable_qr_login(cls.facility)
 
-    def test_last_role_deleted_assigns_qr_login_token(self):
-        learner = FacilityUser.objects.create(
-            username="learner", facility=self.facility
-        )
-        assign_qr_login_token(learner)
-        self.assertIsNotNone(learner.qr_login_token)
-
+    def test_last_role_deleted_assigns_qr_login_token_when_missing(self):
+        user = FacilityUser.objects.create(username="demoted", facility=self.facility)
         role = Role.objects.create(
-            user=learner,
+            user=user,
             collection=self.facility,
             kind=role_kinds.ADMIN,
         )
-        learner.refresh_from_db()
-        self.assertIsNone(learner.qr_login_token)
+        self.assertIsNone(user.qr_login_token)
 
         role.delete()
 
-        learner.refresh_from_db()
-        self.assertIsNotNone(learner.qr_login_token)
-        self.assertGreaterEqual(len(learner.qr_login_token), 16)
+        user.refresh_from_db()
+        self.assertIsNotNone(user.qr_login_token)
+        self.assertGreaterEqual(len(user.qr_login_token), 16)
 
     def test_remaining_role_prevents_qr_login_token_assignment(self):
         learner = FacilityUser.objects.create(
@@ -101,14 +97,15 @@ class RoleDeleteReassignsQRLoginTokenTestCase(TestCase):
         learner = FacilityUser.objects.create(
             username="alreadyhas", facility=self.facility
         )
+        assign_qr_login_token(learner)
+        original = learner.qr_login_token
         role = Role.objects.create(
             user=learner,
             collection=self.facility,
             kind=role_kinds.ADMIN,
         )
-        FacilityUser.objects.filter(pk=learner.pk).update(qr_login_token="b" * 43)
 
         role.delete()
 
         learner.refresh_from_db()
-        self.assertEqual(learner.qr_login_token, "b" * 43)
+        self.assertEqual(learner.qr_login_token, original)
