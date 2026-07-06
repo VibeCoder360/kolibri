@@ -18,6 +18,7 @@ from kolibri.core.content.utils.importability_annotation import (
 )
 from kolibri.core.discovery.well_known import CENTRAL_CONTENT_BASE_INSTANCE_ID
 
+
 CHUNKSIZE = 10000
 
 

@@ -4,6 +4,7 @@ from django.db import models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("content", "0028_contentnode_metadata_labels"),
     ]

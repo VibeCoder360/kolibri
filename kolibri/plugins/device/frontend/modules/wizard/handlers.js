@@ -140,10 +140,8 @@ export function showAvailableChannelsPage(store, params, route) {
 }
 
 /**
- * Loads the select content page state for a given channel and transfer type.
- * @param {object} store - The Vuex store instance.
- * @param {object} params - Route params with drive_id, address_id, and channel_id.
- * @returns {Promise<void>} Resolves when the select content page state is ready.
+ * Handler for going to Select Content Page URL directly
+ * params are { channel_id: string, drive_id?: string, address_id? },
  */
 export function showSelectContentPage(store, params) {
   let selectedDrivePromise = Promise.resolve({});
@@ -260,10 +258,10 @@ export function showSelectContentPage(store, params) {
 }
 
 /**
- * Fetches granular content node data for a topic and updates the wizard tree view.
- * @param {object} store - The Vuex store instance with wizard state.
- * @param {object} topic - The topic content node object with id and title.
- * @returns {Promise<void>} Resolves when the tree view topic has been updated in the store.
+ * Updates wizardState.treeView when a new topic is clicked.
+ *
+ * @param {Object} topic - { id, title, path }
+ *
  */
 export function updateTreeViewTopic(store, topic) {
   const fetchArgs = {};

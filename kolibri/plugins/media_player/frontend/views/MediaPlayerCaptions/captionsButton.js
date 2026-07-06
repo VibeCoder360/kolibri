@@ -15,7 +15,7 @@ class CaptionsButton extends buttonMixin('TextTrackButton') {
 
   /**
    * @override
-   * @returns {string} The CSS class for the button element.
+   * @return {string}
    */
   buildCSSClass() {
     return this.removePopupClass(`vjs-captions-button ${super.buildCSSClass()}`);
@@ -23,7 +23,7 @@ class CaptionsButton extends buttonMixin('TextTrackButton') {
 
   /**
    * @override
-   * @returns {string} The CSS class for the wrapping element.
+   * @return {string}
    */
   buildWrapperCSSClass() {
     return this.removePopupClass(`vjs-captions-button ${super.buildWrapperCSSClass()}`);
@@ -31,8 +31,7 @@ class CaptionsButton extends buttonMixin('TextTrackButton') {
 
   /**
    * @override
-   * @returns {Array<TranscriptMenuItem|SubtitlesMenuItem>} The menu items to display,
-   * or an empty list when fewer than two text tracks are available.
+   * @returns {TranscriptMenuItem[]|SubtitlesMenuItem[]}
    */
   createItems() {
     // Use logic from parent to determine if we should fill menu

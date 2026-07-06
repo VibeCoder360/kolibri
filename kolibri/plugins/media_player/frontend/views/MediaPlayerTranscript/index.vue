@@ -8,8 +8,6 @@
     :aria-label="coreString('transcript')"
     @mouseenter="hovering = true"
     @mouseleave="hovering = false"
-    @focus="hovering = true"
-    @blur="hovering = false"
   >
     <div
       v-show="!cues.length"
@@ -134,8 +132,7 @@
         this.player.currentTime(cueTime + 0.01);
       },
       /**
-       * Move keyboard focus to the first or last cue in the transcript.
-       * @param {string} place - `beginning` or `end`.
+       * @param {String} place `beginning` or `end`
        */
       handleGoTo(place) {
         if (!this.cues.length || !Object.keys(this.$refs).length) {
@@ -211,10 +208,8 @@
         this.$nextTick(this.scrollThrottle);
       },
       /**
-       * Build a reducer that walks each rendered cue and applies `callback`.
-       * Cues that fail to resolve, or callbacks that throw, are skipped.
-       * @param {Function} callback - Reducer invoked as `(reduced, cue)`.
-       * @returns {Function} A reducer compatible with `Array.prototype.reduce`.
+       * @param {Function} callback
+       * @return {Function}
        */
       cueReduce(callback) {
         return (reduced, cueId) => {

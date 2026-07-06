@@ -127,6 +127,30 @@
             </td>
           </tr>
 
+          <tr v-if="showQrLoginRow">
+            <th>{{ myQRCode$() }}</th>
+            <td>
+              <UserQRCode
+                v-if="qrLoginToken"
+                data-testid="qr-login-token-display"
+                :token="qrLoginToken"
+                :size="120"
+              />
+              <template v-else>
+                <KEmptyPlaceholder data-testid="qr-login-token-empty" />
+                <div>
+                  <KButton
+                    appearance="basic-link"
+                    data-testid="generate-qr-token"
+                    :text="generateQrCode$()"
+                    :disabled="assigningQrToken"
+                    @click="handleGenerateQrToken"
+                  />
+                </div>
+              </template>
+            </td>
+          </tr>
+
           <tr v-if="!isLearnerOnlyImport && canEditPassword">
             <th>{{ coreString('passwordLabel') }}</th>
             <td>
@@ -210,16 +234,19 @@
   import commonCoreStrings from 'kolibri/uiText/commonCoreStrings';
   import PermissionsIcon from 'kolibri-common/components/labels/PermissionsIcon';
   import UserPicturePassword from 'kolibri-common/components/UserPicturePassword';
+  import UserQRCode from 'kolibri-common/components/UserQRCode';
   import UserTypeDisplay from 'kolibri-common/components/UserTypeDisplay';
-  import { PermissionTypes } from 'kolibri/constants';
+  import { PermissionTypes, UserKinds } from 'kolibri/constants';
   import useUser from 'kolibri/composables/useUser';
   import GenderDisplayText from 'kolibri-common/components/userAccounts/GenderDisplayText';
   import BirthYearDisplayText from 'kolibri-common/components/userAccounts/BirthYearDisplayText';
   import useTotalProgress from 'kolibri/composables/useTotalProgress';
   import useFacilities from 'kolibri-common/composables/useFacilities';
   import useFacility from 'kolibri-common/composables/useFacility';
+  import useSnackbar from 'kolibri/composables/useSnackbar';
+  import FacilityUserResource from 'kolibri-common/apiResources/FacilityUserResource';
+  import { qrLoginStrings } from 'kolibri-common/strings/qrLoginStrings';
   import { pageLoading } from 'kolibri-common/composables/usePageLoading';
-  import useUserKind from '../../composables/useUserKind';
   import { RoutesMap } from '../../constants';
   import useCurrentUser from '../../composables/useCurrentUser';
   import useOnMyOwnSetup from '../../composables/useOnMyOwnSetup';
@@ -240,6 +267,7 @@
       GenderDisplayText,
       PermissionsIcon,
       UserPicturePassword,
+      UserQRCode,
       UserTypeDisplay,
     },
     mixins: [commonCoreStrings],
@@ -249,22 +277,48 @@
       const { currentUser } = useCurrentUser();
       const {
         isLearnerOnlyImport,
+        userKind,
         userPermissions: _userPermissions,
         isCoach,
         isAdmin,
         isSuperuser,
-        isLearner,
         userHasPermissions,
         userFacilityId,
       } = useUser();
-      const { userKind } = useUserKind();
       const { onMyOwnSetup } = useOnMyOwnSetup();
       const { fetchPoints, totalPoints } = useTotalProgress();
       const { facilities } = useFacilities();
       const { facilityConfig, fetchFacilities, updateFacilityConfig } = useFacility();
       const userPermissions = computed(() => pickBy(_userPermissions.value));
+      const { createSnackbar } = useSnackbar();
+      const { myQRCode$, generateQrCode$, qrTokenOperationFailed$ } = qrLoginStrings;
+
+      // Any user (including coaches, admins, and super admins) can generate a
+      // QR login token for themselves. Learners usually already have one
+      // assigned automatically.
+      const assigningQrToken = ref(false);
+      const generatedQrToken = ref(null);
+      const qrLoginToken = computed(
+        () => currentUser.value?.qr_login_token || generatedQrToken.value,
+      );
+
+      async function handleGenerateQrToken() {
+        assigningQrToken.value = true;
+        try {
+          const { data } = await FacilityUserResource.assignQrToken(currentUser.value.id);
+          generatedQrToken.value = data.qr_login_token;
+        } catch (err) {
+          createSnackbar(qrTokenOperationFailed$());
+        } finally {
+          assigningQrToken.value = false;
+        }
+      }
 
       return {
+        assigningQrToken,
+        qrLoginToken,
+        handleGenerateQrToken,
+        generateQrCode$,
         pageLoading,
         currentUser,
         onMyOwnSetup,
@@ -274,7 +328,6 @@
         isCoach,
         isAdmin,
         isSuperuser,
-        isLearner,
         userHasPermissions,
         userFacilityId,
         showLearnModal,
@@ -285,6 +338,7 @@
         facilities,
         fetchFacilities,
         updateFacilityConfig,
+        myQRCode$,
       };
     },
     computed: {
@@ -320,7 +374,12 @@
         if (this.isSuperuser && this.isLearnerOnlyImport) {
           return true;
         }
-        return this.isLearner;
+        return this.userKind === UserKinds.LEARNER;
+      },
+      showQrLoginRow() {
+        // Unlike picture passwords, QR login is available to every user kind:
+        // coaches, admins, and super admins can generate a code for themselves.
+        return Boolean(this.facilityConfig?.enable_qr_login);
       },
       canEditPassword() {
         const learner_can_edit =

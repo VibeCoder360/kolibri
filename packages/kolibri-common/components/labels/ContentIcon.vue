@@ -52,20 +52,6 @@
         style="top: 0"
       />
       <KIcon
-        v-if="is(ContentNodeKinds.H5P)"
-        :icon="ContentNodeKinds.HTML5"
-        :class="[colorClass]"
-        :color="color"
-        style="top: 0"
-      />
-      <KIcon
-        v-if="is(ContentNodeKinds.ZIM)"
-        :icon="ContentNodeKinds.DOCUMENT"
-        :class="[colorClass]"
-        :color="color"
-        style="top: 0"
-      />
-      <KIcon
         v-if="is(ContentNodeKinds.EXAM)"
         icon="quiz"
         :class="[colorClass]"
@@ -175,8 +161,6 @@
           [ContentNodeKinds.AUDIO]: 'audio',
           [ContentNodeKinds.DOCUMENT]: 'document',
           [ContentNodeKinds.HTML5]: 'html5',
-          [ContentNodeKinds.H5P]: 'html5',
-          [ContentNodeKinds.ZIM]: 'document',
           [ContentNodeKinds.EXAM]: 'exam',
           [ContentNodeKinds.LESSON]: 'lesson',
           [ContentNodeKinds.SLIDESHOW]: 'slideshow',

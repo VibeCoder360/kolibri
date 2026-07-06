@@ -22,6 +22,11 @@ from sqlalchemy import String
 from sqlalchemy.sql.expression import literal
 from sqlalchemy.sql.functions import coalesce
 
+from .paths import get_content_file_name
+from .paths import get_content_storage_file_path
+from .paths import using_remote_storage
+from .sqlalchemybridge import Bridge
+from .sqlalchemybridge import filter_by_uuids
 from kolibri.core.content.apps import KolibriContentConfig
 from kolibri.core.content.errors import InvalidStorageFilenameError
 from kolibri.core.content.models import ChannelMetadata
@@ -34,12 +39,6 @@ from kolibri.core.content.utils.tree import get_channel_node_depth
 from kolibri.core.courses.models import CourseSession
 from kolibri.core.device.models import ContentCacheKey
 from kolibri.core.utils.lock import db_lock
-
-from .paths import get_content_file_name
-from .paths import get_content_storage_file_path
-from .paths import using_remote_storage
-from .sqlalchemybridge import Bridge
-from .sqlalchemybridge import filter_by_uuids
 
 logger = logging.getLogger(__name__)
 
@@ -347,8 +346,7 @@ def set_leaf_node_availability_from_local_file_availability(
     # available for rendering, or False otherwise.
     contentnode_statement = (
         # We could select any property here, as it's the exist that matters.
-        select(1)
-        .select_from(
+        select(1).select_from(
             # This does the first step in the many to many lookup for File
             # and LocalFile.
             FileTable.join(
@@ -638,6 +636,7 @@ def recurse_annotation_up_tree(channel_id):
 
     # Go from the deepest level to the shallowest
     for level in range(node_depth, 0, -1):
+
         logger.info(
             "Annotating ContentNode objects with children for level {level}".format(
                 level=level
@@ -907,6 +906,7 @@ def set_channel_ancestors(channel_id):
 
     # Go from the shallowest to deepest
     for level in range(1, node_depth + 1):
+
         if bridge.engine.name == "sqlite":
             parent_id_expression = ContentNodeTable.c.parent_id
         elif bridge.engine.name == "postgresql":

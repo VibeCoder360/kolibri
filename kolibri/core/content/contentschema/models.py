@@ -2,6 +2,7 @@ from django.db.models import Model
 
 from kolibri.core.content import base_models
 
+
 for model in base_models.__dict__.values():
     if (
         isinstance(model, type)

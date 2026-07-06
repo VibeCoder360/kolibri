@@ -6,6 +6,7 @@ from django.db import models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("lessons", "0003_individualsyncablelesson"),
     ]

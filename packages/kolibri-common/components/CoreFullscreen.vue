@@ -51,7 +51,6 @@
     },
     methods: {
       /**
-       * Toggle fullscreen mode; called by viewer components via $refs.
        * @public
        */
       toggleFullscreen() {

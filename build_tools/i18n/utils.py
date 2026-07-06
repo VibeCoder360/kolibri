@@ -2,7 +2,12 @@ import functools
 import json
 import logging
 import os
+import subprocess
 import sys
+
+
+def install_requirement(requirement_name):
+    subprocess.run([sys.executable, "-m", "pip", "install", requirement_name])
 
 
 def to_locale(language):

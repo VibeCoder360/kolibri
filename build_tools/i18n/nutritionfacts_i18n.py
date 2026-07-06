@@ -2,7 +2,6 @@
 For usage instructions, see:
     https://kolibri-dev.readthedocs.io/en/develop/release_process.html
 """
-
 import csv
 import json
 import logging
@@ -11,6 +10,7 @@ import sys
 
 import click
 import utils
+
 
 logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 logging.StreamHandler(sys.stdout)

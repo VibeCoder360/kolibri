@@ -189,12 +189,6 @@
   import { SelectionTarget } from '../../../../common/resourceSelection/contants';
   import autofocusFirstEl from '../../../../common/directives/autofocusFirstEl';
 
-  /**
-   * @typedef {import('vue').Ref} Ref
-   * @typedef {import('../../../../../composables/quizCreationSpecs.js').QuizExercise} QuizExercise
-   * @typedef {import('../../../../../composables/quizCreationSpecs.js').QuizQuestion} QuizQuestions
-   */
-
   export default {
     name: 'QuizResourceSelection',
     components: {
@@ -311,8 +305,7 @@
       const { closeConfirmationTitle$, closeConfirmationMessage$ } = coachStrings;
 
       /**
-       * Merge exercises into the working resource pool, de-duplicating entries.
-       * @param {QuizExercise[]} resources - exercises to add to the pool
+       * @param {QuizExercise[]} resources
        * @affects workingResourcePool -- Updates it with the given resources and is ensured to have
        * a list of unique resources to avoid unnecessary duplication
        */
@@ -327,8 +320,7 @@
       }
 
       /**
-       * Remove matching exercises from the working resource pool.
-       * @param {QuizExercise[]} [resources] - exercises to remove, matched by id
+       * @param {QuizExercise} content
        * @affects workingResourcePool - Remove given quiz exercise from workingResourcePool
        */
       function removeFromWorkingResourcePool(resources = []) {
@@ -338,8 +330,6 @@
       }
 
       /**
-       * Replace the working resource pool with the given set of exercises.
-       * @param {QuizExercise[]} [resources] - exercises to set as the new pool
        * @affects workingResourcePool - Resets the workingResourcePool to the previous state
        */
       function setWorkingResourcePool(resources = []) {
@@ -347,9 +337,7 @@
       }
 
       /**
-       * Merge questions into the working questions list, de-duplicating entries.
-       * @param {QuizQuestions[]} questions - questions to add to the working list
-       * @param {QuizExercise} resource - exercise providing the questions, added to the pool if new
+       * @param {QuizQuestions[]} questions
        * @affects workingQuestions -- Updates it with the given questions and is ensured to have
        * a list of unique questions to avoid unnecessary duplication
        */
@@ -361,9 +349,7 @@
       }
 
       /**
-       * Drop questions from the working list and prune any resources
-       * left with no selected questions.
-       * @param {QuizQuestions[]} questions - questions to remove, matched by `item`
+       * @param {QuizQuestions[]} questions
        * @affects workingQuestions -- Removes the given questions from the workingQuestions
        */
       function removeFromWorkingQuestions(questions) {
@@ -413,8 +399,6 @@
       /**
        * Practice quizzes should only be included if the resource selection side panel
        * is in `selectPracticeQuiz` mode.
-       * @param {QuizExercise} item - content node to test
-       * @returns {boolean} true when the item is eligible for the current mode
        */
       const isPracticeQuiz = item =>
         !selectPracticeQuiz || get(item, ['options', 'modality'], false) === Modalities.QUIZ;
@@ -423,8 +407,6 @@
        * Because survey questions have no 'correct' answer, and in some cases have a
        * 'correct answer'chosen at random for the sake of having one,
        * we should not allow them to be included in quizzes.
-       * @param {QuizExercise} item - content node to test
-       * @returns {boolean} true when the item is not a survey
        */
       const isNotSurvey = item => get(item, ['options', 'modality'], false) !== Modalities.SURVEY;
 

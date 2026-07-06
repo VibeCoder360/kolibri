@@ -9,6 +9,7 @@ from json import JSONDecodeError
 from kolibri.core.content.models import ChannelMetadata
 from kolibri.core.content.models import ContentNode
 
+
 logger = logging.getLogger(__name__)
 
 

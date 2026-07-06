@@ -1,0 +1,1831 @@
+import logging
+import time
+from collections import OrderedDict
+from datetime import timedelta
+from itertools import groupby
+from uuid import UUID
+from uuid import uuid4
+
+from django.contrib.auth import authenticate
+from django.contrib.auth import login
+from django.contrib.auth import logout
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import PermissionDenied
+from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
+from django.db import transaction
+from django.db.models import Func
+from django.db.models import OuterRef
+from django.db.models import Q
+from django.db.models import Subquery
+from django.db.models import TextField
+from django.db.models import Value
+from django.db.models.functions import Cast
+from django.http import Http404
+from django.http import HttpResponseBadRequest
+from django.shortcuts import get_object_or_404
+from django.utils.decorators import method_decorator
+from django.utils.timezone import now
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_protect
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django_filters.rest_framework import BaseInFilter
+from django_filters.rest_framework import CharFilter
+from django_filters.rest_framework import ChoiceFilter
+from django_filters.rest_framework import DateTimeFilter
+from django_filters.rest_framework import DjangoFilterBackend
+from django_filters.rest_framework import FilterSet
+from django_filters.rest_framework import ModelChoiceFilter
+from django_filters.rest_framework import UUIDFilter
+from morango.api.permissions import BasicMultiArgumentAuthentication
+from morango.constants import transfer_stages
+from morango.constants import transfer_statuses
+from morango.models import TransferSession
+from rest_framework import decorators
+from rest_framework import filters
+from rest_framework import permissions
+from rest_framework import serializers
+from rest_framework import status
+from rest_framework import views
+from rest_framework import viewsets
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import ValidationError as RestValidationError
+from rest_framework.mixins import CreateModelMixin
+from rest_framework.mixins import DestroyModelMixin
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
+
+from .constants import collection_kinds
+from .constants import role_kinds
+from .models import Classroom
+from .models import Collection
+from .models import Facility
+from .models import FacilityDataset
+from .models import FacilityUser
+from .models import LearnerGroup
+from .models import Membership
+from .models import Role
+from .serializers import ClassroomSerializer
+from .serializers import CreateFacilitySerializer
+from .serializers import ExtraFieldsSerializer
+from .serializers import FacilityDatasetSerializer
+from .serializers import FacilitySerializer
+from .serializers import FacilityUserSerializer
+from .serializers import LearnerGroupSerializer
+from .serializers import MembershipSerializer
+from .serializers import PublicFacilitySerializer
+from .serializers import RoleSerializer
+from kolibri.core import error_constants
+from kolibri.core.api import ReadOnlyValuesViewset
+from kolibri.core.api import ValuesViewset
+from kolibri.core.api import ValuesViewsetOrderingFilter
+from kolibri.core.auth.constants import user_kinds
+from kolibri.core.auth.constants.demographics import DEFERRED
+from kolibri.core.auth.constants.demographics import NOT_SPECIFIED
+from kolibri.core.auth.permissions.general import _user_is_admin_for_own_facility
+from kolibri.core.auth.permissions.general import DenyAll
+from kolibri.core.auth.tasks import assign_picture_passwords_to_facility
+from kolibri.core.auth.tasks import assign_qr_login_tokens_to_facility
+from kolibri.core.auth.tasks import cleanup_expired_deleted_users
+from kolibri.core.auth.utils.delete import delete_imported_user
+from kolibri.core.auth.utils.picture_passwords import are_picture_passwords_exhausted
+from kolibri.core.auth.utils.picture_passwords import get_learner_count
+from kolibri.core.auth.utils.qr_tokens import assign_qr_login_token
+from kolibri.core.auth.utils.qr_tokens import reassign_qr_login_token
+from kolibri.core.auth.utils.users import get_remote_users_info
+from kolibri.core.device.permissions import IsSuperuser
+from kolibri.core.device.permissions import NotProvisionedHasPermission
+from kolibri.core.device.utils import allow_guest_access
+from kolibri.core.device.utils import allow_other_browsers_to_connect
+from kolibri.core.device.utils import APP_AUTH_TOKEN_COOKIE_NAME
+from kolibri.core.device.utils import is_full_facility_import
+from kolibri.core.device.utils import valid_app_key_on_request
+from kolibri.core.discovery.utils.network.client import NetworkClient
+from kolibri.core.discovery.utils.network.errors import NetworkLocationNotFound
+from kolibri.core.discovery.utils.network.errors import NetworkLocationResponseFailure
+from kolibri.core.logger.models import UserSessionLog
+from kolibri.core.mixins import BulkCreateMixin
+from kolibri.core.mixins import BulkDeleteMixin
+from kolibri.core.query import annotate_array_aggregate
+from kolibri.core.query import SQCount
+from kolibri.core.serializers import HexOnlyUUIDField
+from kolibri.core.tasks.exceptions import JobRunning
+from kolibri.core.tasks.main import job_storage
+from kolibri.core.utils.pagination import ValuesViewsetPageNumberPagination
+from kolibri.core.utils.token_generator import TokenGenerator
+from kolibri.core.utils.urls import reverse_path
+
+logger = logging.getLogger(__name__)
+
+
+class UUIDInFilter(BaseInFilter, UUIDFilter):
+    pass
+
+
+class ModelChoiceInFilter(BaseInFilter, ModelChoiceFilter):
+    pass
+
+
+class ChoiceInFilter(BaseInFilter, ChoiceFilter):
+    pass
+
+
+class OptionalPageNumberPagination(ValuesViewsetPageNumberPagination):
+    """
+    Pagination class that allows for page number-style pagination, when requested.
+    To activate, the `page_size` argument must be set. For example, to request the first 20 records:
+    `?page_size=20&page=1`
+    """
+
+    page_size = None
+    page_size_query_param = "page_size"
+
+
+class KolibriAuthPermissionsFilter(filters.BaseFilterBackend):
+    """
+    A Django REST Framework filter backend that limits results to those where the
+    requesting user has read object level permissions. This filtering is delegated
+    to the ``filter_readable`` method on ``KolibriAbstractBaseUser``.
+    """
+
+    def filter_queryset(self, request, queryset, view):
+        if request.method == "GET":
+            # If a 'GET' method only return readable items to filter down the queryset.
+            return request.user.filter_readable(queryset)
+        # otherwise, return the full queryset, as permission checks will happen object-by-object
+        # (and filtering here then leads to 404's instead of the more correct 403's)
+        return queryset
+
+
+def _ensure_raw_dict(d):
+    if hasattr(d, "dict"):
+        d = d.dict()
+    return dict(d)
+
+
+class KolibriAuthPermissions(permissions.BasePermission):
+    """
+    A Django REST Framework permissions class that defers to Kolibri's permissions
+    system to determine object-level permissions.
+    """
+
+    def validator(self, request, view, datum):
+        model = view.get_serializer_class().Meta.model
+        validated_data = view.get_serializer().to_internal_value(
+            _ensure_raw_dict(datum)
+        )
+        return request.user.can_create(model, validated_data)
+
+    def has_permission(self, request, view):
+
+        # as `has_object_permission` isn't called for POST/create, we need to check here
+        if request.method == "POST" and request.data:
+            if type(request.data) is list:
+                data = request.data
+            else:
+                data = [request.data]
+
+            return all(self.validator(request, view, datum) for datum in data)
+
+        # for other methods, we return True, as their permissions get checked below
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        # note that there is no entry for POST here, as creation is handled by `has_permission`, above
+        if request.method in permissions.SAFE_METHODS:  # 'GET', 'OPTIONS' or 'HEAD'
+            return request.user.can_read(obj)
+        if request.method in ["PUT", "PATCH"]:
+            return request.user.can_update(obj)
+        if request.method == "DELETE":
+            return request.user.can_delete(obj)
+        return False
+
+
+class IsPINValidPermissions(DenyAll):
+    def has_permission(self, request, view):
+        return request.user.is_superuser or request.user.can_manage_content
+
+    def has_object_permission(self, request, view, obj):
+        return self.has_permission(request, view)
+
+
+class FacilityDatasetFilter(FilterSet):
+
+    facility_id = UUIDFilter(field_name="collection")
+
+    class Meta:
+        model = FacilityDataset
+        fields = ["facility_id"]
+
+
+def _is_full_facility_import(dataset):
+    return is_full_facility_import(dataset["id"])
+
+
+class FacilityDatasetViewSet(ValuesViewset):
+    permission_classes = (KolibriAuthPermissions,)
+    filter_backends = (
+        KolibriAuthPermissionsFilter,
+        DjangoFilterBackend,
+    )
+    filterset_class = FacilityDatasetFilter
+    serializer_class = FacilityDatasetSerializer
+
+    values = (
+        "id",
+        "learner_can_edit_username",
+        "learner_can_edit_name",
+        "learner_can_edit_password",
+        "learner_can_sign_up",
+        "learner_can_delete_account",
+        "learner_can_login_with_no_password",
+        "show_download_button_in_learn",
+        "enable_mark_attendance",
+        "enable_qr_login",
+        "extra_fields",
+        "picture_password_settings",
+        "description",
+        "location",
+        "registered",
+        "preset",
+    )
+
+    field_map = {
+        "allow_guest_access": lambda x: allow_guest_access(),
+        "is_full_facility_import": _is_full_facility_import,
+    }
+
+    def get_queryset(self):
+        return FacilityDataset.objects.filter(
+            collection__kind=collection_kinds.FACILITY
+        )
+
+    @decorators.action(methods=["post"], detail=True)
+    def resetsettings(self, request, pk):
+        try:
+            dataset = FacilityDataset.objects.get(pk=pk)
+            if not request.user.can_update(dataset):
+                raise PermissionDenied("You cannot reset this facility's settings")
+            dataset.reset_to_default_settings()
+            data = FacilityDatasetSerializer(dataset).data
+            return Response(data)
+        except FacilityDataset.DoesNotExist:
+            raise Http404("Facility does not exist")
+
+    @decorators.action(methods=["post", "patch"], detail=True, url_path="update-pin")
+    def update_pin(self, request, pk):
+
+        serializer = ExtraFieldsSerializer(data=request.data)
+        if not serializer.is_valid():
+            return HttpResponseBadRequest("Invalid pin input")
+
+        pin_code = serializer.data.get("pin_code")
+        if request.method == "POST" and not pin_code:
+            return HttpResponseBadRequest("Please provide a pin")
+
+        try:
+            dataset = FacilityDataset.objects.get(pk=pk)
+            if dataset.extra_fields is None:
+                dataset.extra_fields = {}
+            dataset.extra_fields["pin_code"] = pin_code
+            dataset.save()
+            return Response(FacilityDatasetSerializer(dataset).data)
+        except FacilityDataset.DoesNotExist:
+            raise Http404("Facility not found")
+
+    @decorators.action(
+        methods=["patch"],
+        detail=True,
+        url_path="save-facility-login-settings",
+    )
+    def save_facility_login_settings(self, request, pk):
+        dataset = self.get_object()
+        facility = Facility.objects.get(dataset_id=dataset.id)
+
+        new_pps = request.data.get("picture_password_settings")
+        learner_can_login_with_no_password = request.data.get(
+            "learner_can_login_with_no_password"
+        )
+        learner_can_edit_password = request.data.get("learner_can_edit_password")
+        new_enable_qr_login = request.data.get("enable_qr_login")
+
+        # QR login enabling. When flipping from disabled to enabled, enqueue
+        # the bulk-assignment task so all existing eligible learners receive a
+        # token. Disabling just flips the flag; we deliberately leave existing
+        # tokens intact so re-enabling later is cheap and idempotent.
+        if (
+            new_enable_qr_login is not None
+            and new_enable_qr_login
+            and not dataset.enable_qr_login
+        ):
+            dataset.enable_qr_login = True
+            dataset.save()
+
+            job, _ = assign_qr_login_tokens_to_facility.validate_job_data(
+                request.user,
+                data={"facility_id": facility.id},
+            )
+            job_id = assign_qr_login_tokens_to_facility.enqueue(job=job)
+            enqueued_job = job_storage.get_job(job_id)
+            return Response(
+                {
+                    "dataset": FacilityDatasetSerializer(dataset).data,
+                    "task": {
+                        "id": enqueued_job.job_id,
+                        "status": enqueued_job.state,
+                        "percentage": enqueued_job.percentage_progress,
+                        "cancellable": enqueued_job.cancellable,
+                        "facility_id": enqueued_job.facility_id,
+                        "extra_metadata": enqueued_job.extra_metadata,
+                    },
+                },
+                status=status.HTTP_202_ACCEPTED,
+            )
+
+        if (
+            new_enable_qr_login is not None
+            and not new_enable_qr_login
+            and dataset.enable_qr_login
+        ):
+            dataset.enable_qr_login = False
+            dataset.save()
+            return Response(
+                {"dataset": FacilityDatasetSerializer(dataset).data},
+                status=status.HTTP_200_OK,
+            )
+
+        currently_enabled = dataset.picture_password_settings is not None
+        enabling = not currently_enabled and new_pps is not None
+
+        if enabling:
+            if are_picture_passwords_exhausted(dataset.id):
+                return Response(
+                    {"detail": "Picture passwords exhausted for this facility."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            dataset.picture_password_settings = new_pps
+            dataset.learner_can_login_with_no_password = True
+            dataset.learner_can_edit_password = False
+            dataset.save()
+
+            job, _ = assign_picture_passwords_to_facility.validate_job_data(
+                request.user,
+                data={"facility_id": facility.id},
+            )
+            job_id = assign_picture_passwords_to_facility.enqueue(job=job)
+            enqueued_job = job_storage.get_job(job_id)
+            return Response(
+                {
+                    "dataset": FacilityDatasetSerializer(dataset).data,
+                    "task": {
+                        "id": enqueued_job.job_id,
+                        "status": enqueued_job.state,
+                        "percentage": enqueued_job.percentage_progress,
+                        "cancellable": enqueued_job.cancellable,
+                        "facility_id": enqueued_job.facility_id,
+                        "extra_metadata": enqueued_job.extra_metadata,
+                    },
+                },
+                status=status.HTTP_202_ACCEPTED,
+            )
+
+        if currently_enabled and new_pps is not None:
+            dataset.picture_password_settings = new_pps
+            dataset.save()
+            return Response(
+                {"dataset": FacilityDatasetSerializer(dataset).data},
+                status=status.HTTP_200_OK,
+            )
+
+        if new_pps is None:
+            dataset.picture_password_settings = None
+            if learner_can_login_with_no_password:
+                dataset.learner_can_login_with_no_password = True
+                dataset.learner_can_edit_password = False
+            else:
+                dataset.learner_can_login_with_no_password = False
+                if learner_can_edit_password is not None:
+                    dataset.learner_can_edit_password = learner_can_edit_password
+            dataset.save()
+            return Response(
+                {"dataset": FacilityDatasetSerializer(dataset).data},
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(
+            {"detail": "Invalid request."}, status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+class IsPINValidView(views.APIView):
+    permission_classes = (IsPINValidPermissions,)
+
+    def post(self, request, pk):
+        serializer = ExtraFieldsSerializer(data=request.data)
+        if not serializer.is_valid() or serializer.data.get("pin_code") is None:
+            return HttpResponseBadRequest("Invalid pin input")
+
+        input_pin_code = serializer.data.get("pin_code")
+        if not input_pin_code:
+            return HttpResponseBadRequest("Please provide a pin")
+
+        try:
+            dataset = FacilityDataset.objects.get(pk=pk)
+            data = FacilityDatasetSerializer(dataset).data
+            extra_fields = data.get("extra_fields", {})
+            saved_pin_code = extra_fields.get("pin_code")
+        except FacilityDataset.DoesNotExist:
+            raise Http404("Facility not found")
+
+        return Response({"is_pin_valid": saved_pin_code == input_pin_code})
+
+
+class FacilityUserFilter(FilterSet):
+
+    USER_TYPE_CHOICES = (
+        ("learner", "learner"),
+        ("superuser", "superuser"),
+    ) + role_kinds.choices
+
+    member_of = ModelChoiceFilter(
+        method="filter_member_of", queryset=Collection.objects.all()
+    )
+    related_to__in = ModelChoiceInFilter(
+        method="filter_related_to__in", queryset=Collection.objects.all()
+    )
+    user_type = ChoiceFilter(
+        choices=USER_TYPE_CHOICES,
+        method="filter_user_type",
+    )
+    user_type__in = ChoiceInFilter(
+        choices=USER_TYPE_CHOICES,
+        method="filter_user_type",
+    )
+    exclude_member_of = ModelChoiceFilter(
+        method="filter_exclude_member_of", queryset=Collection.objects.all()
+    )
+    exclude_coach_for = ModelChoiceFilter(
+        method="filter_exclude_coach_for", queryset=Collection.objects.all()
+    )
+    exclude_user_type = ChoiceFilter(
+        choices=USER_TYPE_CHOICES,
+        method="filter_exclude_user_type",
+    )
+    date_joined__gte = DateTimeFilter(
+        field_name="date_joined",
+        lookup_expr="gte",
+    )
+    date_joined__lte = DateTimeFilter(
+        field_name="date_joined",
+        lookup_expr="lte",
+    )
+    birth_year_gte = CharFilter(method="filter_birth_year_gte")
+    birth_year_lte = CharFilter(method="filter_birth_year_lte")
+
+    by_ids = UUIDInFilter(field_name="id")
+
+    def filter_member_of(self, queryset, name, value):
+        return queryset.filter(Q(memberships__collection=value) | Q(facility=value))
+
+    def filter_related_to__in(self, queryset, name, value):
+        """
+        Filter users related to any of the collections in the provided value. Related through
+        memberships, facility, or roles.
+        """
+        return queryset.filter(
+            Q(memberships__collection__in=value)
+            | Q(facility__in=value)
+            | Q(roles__collection__in=value)
+        )
+
+    def filter_user_type(self, queryset, name, value):
+        if isinstance(value, str):
+            value = [value]
+
+        user_type_filter = Q()
+
+        if "learner" in value:
+            user_type_filter |= Q(roles__isnull=True)
+
+        if "coach" in value:
+            # Return users with either coach or classroom assignable coach roles
+            user_type_filter |= Q(roles__kind=role_kinds.COACH) | Q(
+                roles__kind=role_kinds.ASSIGNABLE_COACH
+            )
+        if "superuser" in value:
+            user_type_filter |= Q(devicepermissions__is_superuser=True)
+
+        rest_filters = [
+            user_type_value
+            for user_type_value in value
+            if user_type_value not in ["learner", "coach", "superuser"]
+        ]
+
+        if rest_filters:
+            user_type_filter |= Q(roles__kind__in=rest_filters)
+
+        return queryset.filter(user_type_filter)
+
+    def filter_exclude_member_of(self, queryset, name, value):
+        return queryset.exclude(Q(memberships__collection=value) | Q(facility=value))
+
+    def filter_exclude_coach_for(self, queryset, name, value):
+        return queryset.exclude(
+            Q(
+                roles__in=Role.objects.filter(
+                    Q(kind=role_kinds.COACH) | Q(kind=role_kinds.ASSIGNABLE_COACH),
+                    collection=value,
+                )
+            )
+        )
+
+    def filter_exclude_user_type(self, queryset, name, value):
+        if value == "learner":
+            return queryset.exclude(roles__isnull=True)
+        if value == "superuser":
+            return queryset.exclude(devicepermissions__is_superuser=True)
+        return queryset.exclude(roles__kind=value)
+
+    def filter_birth_year_gte(self, queryset, name, value):
+        queryset = queryset.exclude(
+            Q(birth_year__isnull=True)
+            | Q(birth_year=NOT_SPECIFIED)
+            | Q(birth_year=DEFERRED)
+        )
+
+        return queryset.filter(Q(birth_year__gte=value))
+
+    def filter_birth_year_lte(self, queryset, name, value):
+        queryset = queryset.exclude(
+            Q(birth_year__isnull=True)
+            | Q(birth_year=NOT_SPECIFIED)
+            | Q(birth_year=DEFERRED)
+        )
+
+        return queryset.filter(Q(birth_year__lte=value))
+
+    class Meta:
+        model = FacilityUser
+        fields = [
+            "member_of",
+            "related_to__in",
+            "user_type",
+            "user_type__in",
+            "exclude_member_of",
+            "exclude_user_type",
+            "by_ids",
+            "date_joined__gte",
+            "date_joined__lte",
+            "birth_year_gte",
+            "birth_year_lte",
+        ]
+
+
+class PublicFacilityUserViewSet(ReadOnlyValuesViewset):
+    queryset = FacilityUser.objects.all()
+    authentication_classes = [BasicMultiArgumentAuthentication]
+    permission_classes = [IsAuthenticated]
+    values = (
+        "id",
+        "username",
+        "full_name",
+        "facility",
+        "roles__kind",
+        "devicepermissions__is_superuser",
+        "id_number",
+        "gender",
+        "birth_year",
+    )
+    field_map = {
+        "is_superuser": lambda x: bool(x.pop("devicepermissions__is_superuser")),
+    }
+
+    def get_queryset(self):
+        if self.request.user.is_anonymous:
+            return FacilityUser.objects.none()
+        facility_id = self.request.query_params.get(
+            "facility_id", self.request.user.facility_id
+        )
+        try:
+            facility_id = UUID(facility_id).hex
+        except ValueError:
+            return self.queryset.none()
+
+        # if user has admin rights for the facility returns the list of users
+        queryset = self.queryset.filter(facility_id=facility_id)
+        # otherwise, the endpoint returns only the user information
+        if not self.request.user.is_superuser and not _user_is_admin_for_own_facility(
+            self.request.user
+        ):
+            queryset = queryset.filter(id=self.request.user.id)
+
+        return queryset
+
+    def consolidate(self, items, queryset):
+        output = []
+        items = sorted(items, key=lambda x: x["id"])
+        for key, group in groupby(items, lambda x: x["id"]):
+            roles = []
+            for item in group:
+                role = item.pop("roles__kind")
+                if role is not None:
+                    roles.append(role)
+            item["roles"] = roles
+            output.append(item)
+        return output
+
+
+class FacilityUserConsolidateMixin:
+    """
+    Mixin for FacilityUser ViewSets to handle consolidate logic
+    """
+
+    def consolidate(self, items, queryset):
+        output = []
+        items = sorted(items, key=lambda x: x["id"])
+        ordering_param = self.request.query_params.get("ordering", self.order_by_field)
+        reverse = False
+        for key, group in groupby(items, lambda x: x["id"]):
+            roles = []
+            for item in group:
+                role = {
+                    "collection": item.pop("roles__collection"),
+                    "kind": item.pop("roles__kind"),
+                    "id": item.pop("roles__id"),
+                }
+                if role["collection"]:
+                    # Our values call will return null for users with no assigned roles
+                    # So filter them here.
+                    roles.append(role)
+            item["roles"] = roles
+            output.append(item)
+            if ordering_param.startswith("-"):
+                ordering_param = ordering_param[1:]
+                reverse = True
+        output = sorted(
+            output,
+            key=lambda x: (
+                x[ordering_param].lower()
+                if isinstance(x[ordering_param], str)
+                else x[ordering_param]
+            ),
+            reverse=reverse,
+        )
+        return output
+
+
+class FacilityUserViewSet(FacilityUserConsolidateMixin, ValuesViewset, BulkDeleteMixin):
+    permission_classes = (KolibriAuthPermissions,)
+    pagination_class = OptionalPageNumberPagination
+    filter_backends = (
+        KolibriAuthPermissionsFilter,
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        ValuesViewsetOrderingFilter,
+    )
+    order_by_field = "username"
+
+    queryset = FacilityUser.objects.all().order_by(order_by_field)
+    serializer_class = FacilityUserSerializer
+    filterset_class = FacilityUserFilter
+
+    search_fields = ("username", "full_name")
+
+    values = (
+        "id",
+        "username",
+        "full_name",
+        "facility",
+        "roles__kind",
+        "roles__collection",
+        "roles__id",
+        "devicepermissions__is_superuser",
+        "id_number",
+        "gender",
+        "birth_year",
+        "extra_demographics",
+        "date_joined",
+        "picture_password",
+        "qr_login_token",
+    )
+
+    # Fields that are too large or sensitive for the unpaginated bulk list
+    # response, but are included when a single object is serialized (retrieve,
+    # create, update). ``profile_image`` can be up to ~150 KB of base64 per
+    # user, so returning it for every member of a large facility would bloat
+    # the roster response by tens of megabytes on every page load.
+    detail_only_values = ("profile_image",)
+
+    ordering_fields = (
+        "id",
+        "username",
+        "full_name",
+        "id_number",
+        "gender",
+        "birth_year",
+        "date_joined",
+    )
+
+    field_map = {
+        "is_superuser": lambda x: bool(x.pop("devicepermissions__is_superuser"))
+    }
+
+    def serialize_object(self, **filter_kwargs):
+        original_values = self._values
+        self._values = original_values + self.detail_only_values
+        try:
+            return super().serialize_object(**filter_kwargs)
+        finally:
+            self._values = original_values
+
+    def destroy(self, request, *args, **kwargs):
+        if kwargs.get("pk"):
+            # Single object deletion
+            user = self.get_object()
+            user.date_deleted = now()
+            user.save()
+            try:
+                cleanup_expired_deleted_users.enqueue()
+            except JobRunning:
+                pass  # Task is already running, do nothing
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            # Bulk deletion
+            return self.bulk_destroy(request, *args, **kwargs)
+
+    def perform_bulk_destroy(self, objects):
+        if objects.filter(id=self.request.user.id).exists():
+            raise PermissionDenied("Super user cannot delete self")
+        objects.update(date_deleted=now())
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        # if the user is updating their own password, ensure they don't get logged out
+        if self.request.user == instance:
+            update_session_auth_hash(self.request, instance)
+
+    @decorators.action(detail=True, methods=["post"])
+    def rotate_qr_token(self, request, pk):
+        """
+        Generates a new QR login token for the user, invalidating any
+        previously-printed card. Facility admins can rotate any user's token;
+        any user can rotate their own (e.g. a coach regenerating their
+        own card).
+        """
+        user = get_object_or_404(FacilityUser, pk=pk)
+        if not (
+            request.user == user
+            or request.user.is_superuser
+            or request.user.has_role_for_collection(role_kinds.ADMIN, user.facility)
+        ):
+            raise PermissionDenied(
+                "Only facility admins can rotate other users' QR tokens."
+            )
+        reassign_qr_login_token(user)
+        return Response({"qr_login_token": user.qr_login_token})
+
+    @decorators.action(detail=True, methods=["post"])
+    def assign_qr_token(self, request, pk):
+        """
+        Assigns a QR login token to the user if they don't
+        already have one. Idempotent: a no-op (returning the existing token)
+        if the user already has one. Facility admins can assign to any user;
+        any user can assign a token to themselves (e.g. a coach or admin
+        generating their own card).
+        """
+        user = get_object_or_404(FacilityUser, pk=pk)
+        if not (
+            request.user == user
+            or request.user.is_superuser
+            or request.user.has_role_for_collection(role_kinds.ADMIN, user.facility)
+        ):
+            raise PermissionDenied(
+                "Only facility admins can assign QR tokens to other users."
+            )
+        assign_qr_login_token(user)
+        return Response({"qr_login_token": user.qr_login_token})
+
+    @decorators.action(
+        detail=False, methods=["post"], permission_classes=[IsAuthenticated]
+    )
+    def assign_qr_tokens(self, request):
+        """
+        Bulk-assign QR login tokens to the given learners, only for those that
+        do not already have one. Enqueues a background task and returns its job
+        info so the client can display progress. Only facility admins can call
+        this. Expects a non-empty ``user_ids`` list in the request body; the
+        facility is resolved from the users themselves.
+        """
+        user_ids = request.data.get("user_ids")
+        if not isinstance(user_ids, list) or not user_ids:
+            raise RestValidationError("A non-empty 'user_ids' list is required.")
+
+        first_user = get_object_or_404(FacilityUser, pk=user_ids[0])
+        facility = first_user.facility
+        if not (
+            request.user.is_superuser
+            or request.user.has_role_for_collection(role_kinds.ADMIN, facility)
+        ):
+            raise PermissionDenied("Only facility admins can assign QR tokens.")
+
+        job, _ = assign_qr_login_tokens_to_facility.validate_job_data(
+            request.user,
+            data={"facility_id": facility.id, "user_ids": user_ids},
+        )
+        job_id = assign_qr_login_tokens_to_facility.enqueue(job=job)
+        enqueued_job = job_storage.get_job(job_id)
+        return Response(
+            {
+                "task": {
+                    "id": enqueued_job.job_id,
+                    "status": enqueued_job.state,
+                    "percentage": enqueued_job.percentage_progress,
+                    "cancellable": enqueued_job.cancellable,
+                    "facility_id": enqueued_job.facility_id,
+                    "extra_metadata": enqueued_job.extra_metadata,
+                }
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class DeletedFacilityUserViewSet(
+    FacilityUserConsolidateMixin,
+    ReadOnlyValuesViewset,
+    DestroyModelMixin,
+    BulkDeleteMixin,
+):
+    """Viewset for managing soft-deleted FacilityUsers."""
+
+    permission_classes = (KolibriAuthPermissions,)
+    pagination_class = OptionalPageNumberPagination
+    filter_backends = (
+        KolibriAuthPermissionsFilter,
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        ValuesViewsetOrderingFilter,
+    )
+
+    order_by_field = "date_deleted"
+    queryset = FacilityUser.soft_deleted_objects.all().order_by(order_by_field)
+    serializer_class = FacilityUserSerializer
+    filterset_class = FacilityUserFilter
+
+    search_fields = FacilityUserViewSet.search_fields
+    values = FacilityUserViewSet.values + ("date_deleted",)
+    ordering_fields = FacilityUserViewSet.ordering_fields + ("date_deleted",)
+    field_map = FacilityUserViewSet.field_map
+
+    @decorators.action(detail=False, methods=["post"])
+    def restore(self, request):
+        """
+        Restore soft-deleted FacilityUsers.
+        """
+        # Permissions for allowing bulk restore are the same as for bulk destroy
+        if not self.allow_bulk_destroy():
+            return Response(
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        users = self.filter_queryset(self.get_queryset())
+        if not users.exists():
+            raise Http404("No deleted users found to restore.")
+
+        users.update(date_deleted=None)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SanitizeInputsSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    facility = HexOnlyUUIDField()
+
+
+class UsernameAvailableView(views.APIView):
+    def post(self, request):
+        serializer = SanitizeInputsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        username = serializer.validated_data["username"]
+        facility_id = serializer.validated_data["facility"]
+        if not username or not facility_id:
+            return Response(
+                "Must specify username, and facility",
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            Facility.objects.get(id=facility_id)
+        except (ValueError, ObjectDoesNotExist):
+            return Response(
+                "Facility not found",
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            FacilityUser.objects.get(username__iexact=username, facility=facility_id)
+            return Response(
+                [
+                    {
+                        "id": error_constants.USERNAME_ALREADY_EXISTS,
+                        "metadata": {
+                            "field": "username",
+                            "message": "Username already exists.",
+                        },
+                    }
+                ],
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ObjectDoesNotExist:
+            return Response(True, status=status.HTTP_200_OK)
+
+
+class UserIdParamSerializer(serializers.Serializer):
+    user_id = HexOnlyUUIDField()
+
+
+class DeleteImportedUserView(views.APIView):
+    permission_classes = [KolibriAuthPermissions]
+
+    def delete(self, request, user_id):
+        """
+        Given a user ID, delete the user from the current facility, and remove
+        certificates and corresponding morango records.
+        """
+        serializer = UserIdParamSerializer(data={"user_id": user_id})
+        serializer.is_valid(raise_exception=True)
+
+        validated_user_id = serializer.validated_data["user_id"]
+        try:
+            user = FacilityUser.objects.get(id=validated_user_id)
+            self.check_object_permissions(request, user)
+
+            delete_imported_user(user)
+
+            return Response({"user_id": user.id})
+        except FacilityUser.DoesNotExist:
+            raise Http404("User does not exist")
+
+
+class FacilityUsernameViewSet(ReadOnlyValuesViewset):
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter)
+    filterset_fields = ("facility",)
+    search_fields = ("^username",)
+
+    values = ("username",)
+
+    def get_queryset(self):
+        if valid_app_key_on_request(self.request):
+            # Special case for app context to return usernames for
+            # the list display
+            return FacilityUser.objects.all()
+        return FacilityUser.objects.filter(
+            Q(dataset__learner_can_login_with_no_password=True)
+            | Q(dataset__picture_password_settings__isnull=False),
+            roles=None,
+        ).filter(
+            Q(devicepermissions__is_superuser=False) | Q(devicepermissions__isnull=True)
+        )
+
+
+class MembershipFilter(FilterSet):
+    user_ids = CharFilter(method="filter_user_ids")
+    by_ids = CharFilter(method="filter_by_ids")
+
+    def filter_user_ids(self, queryset, name, value):
+        return queryset.filter(user_id__in=value.split(","))
+
+    def filter_by_ids(self, queryset, name, value):
+        return queryset.filter(id__in=value.split(","))
+
+    class Meta:
+        model = Membership
+        fields = ["user", "collection", "user_ids", "by_ids"]
+
+
+class MembershipViewSet(BulkDeleteMixin, BulkCreateMixin, viewsets.ModelViewSet):
+    permission_classes = (KolibriAuthPermissions,)
+    filter_backends = (KolibriAuthPermissionsFilter, DjangoFilterBackend)
+    queryset = Membership.objects.all()
+    serializer_class = MembershipSerializer
+    filterset_class = MembershipFilter
+
+
+class RoleFilter(FilterSet):
+    user_ids = CharFilter(method="filter_user_ids")
+    by_ids = CharFilter(method="filter_by_ids")
+
+    def filter_user_ids(self, queryset, name, value):
+        return queryset.filter(user_id__in=value.split(","))
+
+    def filter_by_ids(self, queryset, name, value):
+        return queryset.filter(id__in=value.split(","))
+
+    class Meta:
+        model = Role
+        fields = ["user", "collection", "kind", "user_ids", "by_ids"]
+
+
+class RoleViewSet(BulkDeleteMixin, BulkCreateMixin, viewsets.ModelViewSet):
+    permission_classes = (KolibriAuthPermissions,)
+    filter_backends = (KolibriAuthPermissionsFilter, DjangoFilterBackend)
+    queryset = Role.objects.all()
+    serializer_class = RoleSerializer
+    filterset_class = RoleFilter
+    filterset_fields = ["user", "collection", "kind", "user_ids"]
+
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            super().perform_create(serializer)
+            instances = serializer.instance
+            if not isinstance(instances, list):
+                instances = [instances]
+            user_ids = [role.user_id for role in instances]
+            # Picture passwords are learner-only, so clear them on promotion.
+            # QR login tokens are deliberately kept: coaches and admins may
+            # hold a QR token too, so a promoted learner keeps their card.
+            affected_users = FacilityUser.objects.filter(
+                id__in=user_ids, picture_password__isnull=False
+            )
+            for user in affected_users:
+                user.picture_password = None
+                user.save(update_fields=["picture_password"])
+
+
+dataset_keys = [
+    "dataset__id",
+    "dataset__learner_can_edit_username",
+    "dataset__learner_can_edit_name",
+    "dataset__learner_can_edit_password",
+    "dataset__learner_can_sign_up",
+    "dataset__learner_can_delete_account",
+    "dataset__learner_can_login_with_no_password",
+    "dataset__show_download_button_in_learn",
+    "dataset__extra_fields",
+    "dataset__picture_password_settings",
+    "dataset__enable_qr_login",
+    "dataset__description",
+    "dataset__location",
+    "dataset__registered",
+    "dataset__preset",
+]
+
+
+# map function to pop() all of the dataset__ items into an dict
+# then assign that new dict to the `dataset` key of the facility
+def _map_dataset(facility):
+    dataset = {}
+    for dataset_key in dataset_keys:
+        stripped_key = dataset_key.replace("dataset__", "")
+        dataset[stripped_key] = facility.pop(dataset_key)
+    return dataset
+
+
+def _facility_num_learners(facility):
+    return get_learner_count(facility["dataset__id"])
+
+
+def _picture_passwords_exhausted(facility):
+    return are_picture_passwords_exhausted(facility["dataset__id"])
+
+
+class FacilityViewSet(ValuesViewset):
+    permission_classes = (KolibriAuthPermissions,)
+    filter_backends = (KolibriAuthPermissionsFilter,)
+    queryset = Facility.objects.all()
+    serializer_class = FacilitySerializer
+
+    facility_values = [
+        "id",
+        "name",
+        "num_classrooms",
+        "num_users",
+        "last_successful_sync",
+        "last_failed_sync",
+    ]
+
+    values = tuple(facility_values + dataset_keys)
+
+    # regular dict can be used after removal for support of python3.6
+    field_map = OrderedDict(
+        [
+            # must precede _map_dataset since it depends on the dataset ID
+            ("num_learners", _facility_num_learners),
+            ("picture_passwords_exhausted", _picture_passwords_exhausted),
+            ("dataset", _map_dataset),
+        ]
+    )
+
+    def annotate_queryset(self, queryset):
+        transfer_session_dataset_filter = Func(
+            Cast(OuterRef("dataset"), TextField()),
+            Value("-"),
+            Value(""),
+            function="replace",
+            output_field=TextField(),
+        )
+
+        return (
+            queryset.annotate(
+                num_users=SQCount(
+                    FacilityUser.objects.filter(facility=OuterRef("id")), field="id"
+                )
+            )
+            .annotate(
+                num_classrooms=SQCount(
+                    Classroom.objects.filter(parent=OuterRef("id")), field="id"
+                )
+            )
+            .annotate(
+                last_successful_sync=Subquery(
+                    # the sync command does a pull, then a push, so if the push succeeded,
+                    # the pull likely did too, which means this should represent when the
+                    # facility was last fully and successfully synced
+                    TransferSession.objects.filter(
+                        push=True,
+                        active=False,
+                        transfer_stage=transfer_stages.CLEANUP,
+                        transfer_stage_status=transfer_statuses.COMPLETED,
+                        filter=transfer_session_dataset_filter,
+                    )
+                    .order_by("-last_activity_timestamp")
+                    .values("last_activity_timestamp")[:1]
+                )
+            )
+            .annotate(
+                last_failed_sync=Subquery(
+                    # Here we simply look for if any transfer session has errored
+                    TransferSession.objects.filter(
+                        transfer_stage_status=transfer_statuses.ERRORED,
+                        filter=transfer_session_dataset_filter,
+                    )
+                    .order_by("-last_activity_timestamp")
+                    .values("last_activity_timestamp")[:1]
+                )
+            )
+        )
+
+    @decorators.action(methods=["post"], detail=False, permission_classes=[IsSuperuser])
+    def create_facility(self, request):
+        serializer = CreateFacilitySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response()
+
+
+class PublicFacilityViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Facility.objects.all()
+    serializer_class = PublicFacilitySerializer
+
+
+class ClassroomFilter(FilterSet):
+
+    role = CharFilter(method="filter_has_role_for")
+    parent = ModelChoiceFilter(queryset=Facility.objects.all())
+
+    def filter_has_role_for(self, queryset, name, value):
+        requesting_user = self.request.user
+        if requesting_user.is_superuser:
+            return queryset
+
+        if requesting_user.is_anonymous:
+            return queryset.none()
+
+        # filter queryset by admin role and coach role
+        roles = requesting_user.roles.exclude(kind=role_kinds.ASSIGNABLE_COACH)
+
+        if roles.filter(
+            collection_id=requesting_user.facility_id, kind=role_kinds.ADMIN
+        ).exists():
+            return queryset
+
+        if value == role_kinds.COACH:
+            roles = roles.filter(kind=value)
+
+        return queryset.filter(
+            Q(id__in=roles.values("collection_id"))
+            | Q(parent_id__in=roles.values("collection_id"))
+        )
+
+    class Meta:
+        model = Classroom
+        fields = ["role", "parent"]
+
+
+class ClassroomViewSet(ValuesViewset):
+    permission_classes = (KolibriAuthPermissions,)
+    filter_backends = (KolibriAuthPermissionsFilter, DjangoFilterBackend)
+    queryset = Classroom.objects.all()
+    serializer_class = ClassroomSerializer
+    filterset_class = ClassroomFilter
+
+    values = (
+        "id",
+        "name",
+        "parent",
+        "learner_count",
+        "role__user__id",
+        "role__user__devicepermissions__is_superuser",
+        "role__user__full_name",
+        "role__user__username",
+    )
+
+    def annotate_queryset(self, queryset):
+        return queryset.annotate(
+            learner_count=SQCount(
+                FacilityUser.objects.filter(memberships__collection=OuterRef("id")),
+                field="id",
+            )
+        )
+
+    def consolidate(self, items, queryset):
+        output = []
+        items = sorted(items, key=lambda x: x["id"])
+        coach_ids = list(
+            set(
+                [
+                    item["role__user__id"]
+                    for item in items
+                    if item["role__user__id"] is not None
+                ]
+            )
+        )
+        soft_deleted_user_ids = list(
+            FacilityUser.soft_deleted_objects.all().values_list("id", flat=True)
+        )
+        active_coach_ids = [
+            coach_id for coach_id in coach_ids if coach_id not in soft_deleted_user_ids
+        ]
+        facility_roles = {
+            obj.pop("user"): obj
+            for obj in Role.objects.filter(
+                user_id__in=active_coach_ids, collection__kind=collection_kinds.FACILITY
+            ).values("user", "kind", "collection", "id")
+        }
+
+        for key, group in groupby(items, lambda x: x["id"]):
+            coaches = []
+            group_list = list(group)
+            base_item = group_list[0]
+
+            for item in group_list:
+                user_id = item.get("role__user__id")
+                if user_id in active_coach_ids:
+                    roles = []
+                    if user_id in facility_roles and facility_roles[user_id][
+                        "collection"
+                    ] == item.get("parent"):
+                        roles.append(facility_roles[user_id])
+
+                    coach = {
+                        "id": user_id,
+                        "facility": item.get("parent"),
+                        "is_superuser": bool(
+                            item.get("role__user__devicepermissions__is_superuser")
+                        ),
+                        "full_name": item.get("role__user__full_name"),
+                        "username": item.get("role__user__username"),
+                        "roles": roles,
+                    }
+                    coaches.append(coach)
+            consolidated_item = {
+                "id": base_item.get("id"),
+                "name": base_item.get("name"),
+                "parent": base_item.get("parent"),
+                "learner_count": base_item.get("learner_count"),
+                "coaches": coaches,
+            }
+            output.append(consolidated_item)
+
+        return output
+
+
+class LearnerGroupViewSet(ValuesViewset):
+    permission_classes = (KolibriAuthPermissions,)
+    filter_backends = (KolibriAuthPermissionsFilter, DjangoFilterBackend)
+    queryset = LearnerGroup.objects.all()
+    serializer_class = LearnerGroupSerializer
+
+    filterset_fields = ("parent",)
+
+    values = ("id", "name", "parent", "user_ids")
+
+    def annotate_queryset(self, queryset):
+        return annotate_array_aggregate(
+            queryset,
+            filter=FacilityUser.get_is_active_q("membership"),
+            user_ids="membership__user__id",
+        )
+
+
+class BaseSignUpViewSet(viewsets.GenericViewSet, CreateModelMixin):
+    serializer_class = FacilityUserSerializer
+
+    def check_can_signup(self, serializer):
+        """
+        Check if the user can sign up to the specified facility.
+        """
+        facility = serializer.validated_data["facility"]
+        if (
+            not facility.dataset.learner_can_sign_up
+            or not facility.dataset.full_facility_import
+        ):
+            raise PermissionDenied("Cannot sign up to this facility")
+
+    def perform_create(self, serializer):
+        """
+        Handle the creation of a new user, including validation and logging in.
+        """
+        self.check_can_signup(serializer)
+        serializer.save()
+        data = serializer.validated_data
+        authenticated_user = authenticate(
+            username=data["username"],
+            password=data["password"],
+            facility=data["facility"],
+        )
+        login(self.request, authenticated_user)
+
+
+@method_decorator(csrf_protect, name="dispatch")
+class SignUpViewSet(BaseSignUpViewSet):
+    """
+    Viewset for signing up a user with CSRF protection.
+    """
+
+    pass
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class PublicSignUpViewSet(BaseSignUpViewSet):
+    """
+    Identical to the SignUpViewset except that it does not login the user.
+    This endpoint is intended to allow a FacilityUser in a different facility
+    on another device to be cloned into a facility on this device, to facilitate
+    moving a user from one facility to another.
+
+    It also allows for historic serializer classes in the case that we
+    make an update to our implementation, and we want to keep the API stable.
+    """
+
+    legacy_serializer_classes = []
+
+    def create(self, request, *args, **kwargs):
+        exception = None
+        serializer_kwargs = dict(data=request.data)
+        serializer_kwargs.setdefault("context", self.get_serializer_context())
+        for serializer_class in [
+            self.serializer_class
+        ] + self.legacy_serializer_classes:
+            serializer = serializer_class(**serializer_kwargs)
+            try:
+                serializer.is_valid(raise_exception=True)
+                break
+            except Exception as e:
+                exception = e
+        if exception:
+            raise exception
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            serializer.data, status=status.HTTP_201_CREATED, headers=headers
+        )
+
+    def perform_create(self, serializer):
+        self.check_can_signup(serializer)
+        serializer.save()
+
+
+class SetNonSpecifiedPasswordView(views.APIView):
+    def post(self, request):
+        username = request.data.get("username", "")
+        password = request.data.get("password", "")
+        facility_id = request.data.get("facility", None)
+
+        if not username or not password or not facility_id:
+            return Response(
+                "Must specify username, password, and facility",
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        error_message = "Suitable user does not exist"
+
+        try:
+            user = FacilityUser.objects.get(username=username, facility=facility_id)
+        except (ValueError, ObjectDoesNotExist):
+            raise Http404(error_message)
+
+        if user.password != NOT_SPECIFIED or hasattr(user, "os_user"):
+            raise Http404(error_message)
+
+        user.set_password(password)
+        user.save()
+
+        return Response()
+
+
+class CreateSessionSerializer(serializers.Serializer):
+    # allow_blank so that picture-password requests can omit username entirely
+    username = serializers.CharField(required=False, default=None, allow_blank=True)
+    user_id = HexOnlyUUIDField(required=False, default=None)
+    password = serializers.CharField(
+        default="",
+        write_only=True,
+        required=False,
+        allow_blank=True,
+    )
+    facility = serializers.PrimaryKeyRelatedField(
+        queryset=Facility.objects.all(),
+        default=Facility.get_default_facility,
+        required=False,
+    )
+    auth_token = serializers.CharField(required=False, default=None)
+    picture_password = serializers.CharField(
+        required=False,
+        default=None,
+        allow_null=True,
+        allow_blank=False,
+        # Format is exactly three dot-separated integers, each 1–2 digits
+        # (icon indices 0–99), e.g. "3.7.12". min/max_length are a fast
+        # pre-check; the regex is the authoritative format constraint.
+        min_length=5,
+        max_length=8,
+        validators=[
+            RegexValidator(
+                r"^\d{1,2}\.\d{1,2}\.\d{1,2}$",
+                message="picture_password must be three dot-separated integers.",
+            )
+        ],
+    )
+    qr_login_token = serializers.CharField(
+        required=False,
+        default=None,
+        allow_null=True,
+        allow_blank=False,
+        # `secrets.token_urlsafe(32)` produces ~43 chars; bound the column at
+        # 64 to allow for future format changes. min_length is a fast pre-check
+        # to reject obviously-malformed scans before hitting the DB.
+        min_length=16,
+        max_length=64,
+    )
+
+    def validate(self, attrs):
+        username = attrs.get("username")
+        password = attrs.get("password")
+        facility = attrs.get("facility")
+        user_id = attrs.get("user_id")
+        auth_token = attrs.get("auth_token")
+        picture_password = attrs.get("picture_password")
+        qr_login_token = attrs.get("qr_login_token")
+
+        request = self.context.get("request")
+
+        user = None
+
+        # OS User authentication
+        if valid_app_key_on_request(request):
+            # If we are in app context, then try to get the automatically created OS User
+            # if it matches the username, without needing a password.
+            user = self._check_os_user(request, username)
+
+        # user_id/auth_token authentication
+        if user is None and user_id and auth_token:
+            if TokenGenerator().check_token(user_id, auth_token):
+                user = FacilityUser.objects.filter(
+                    id=user_id, facility=facility
+                ).first()
+
+        # picture password authentication
+        if user is None and picture_password is not None:
+            user = authenticate(
+                request, picture_password=picture_password, facility=facility
+            )
+
+        # QR token authentication. Same isolation rule as picture password: if
+        # a qr_login_token was supplied we never fall through to
+        # username/password auth, even on failure.
+        if user is None and qr_login_token is not None and picture_password is None:
+            user = authenticate(
+                request, qr_login_token=qr_login_token, facility=facility
+            )
+
+        # username/password authentication — intentionally skipped when
+        # picture_password or qr_login_token was supplied (even if that auth
+        # failed), so a failed alternative-credential attempt cannot fall
+        # through to a username/password login with whatever credentials were
+        # also sent.
+        if user is None and picture_password is None and qr_login_token is None:
+            user = authenticate(
+                request, username=username, password=password, facility=facility
+            )
+
+        if user is not None and user.is_active:
+            attrs["user"] = user
+            return attrs
+
+        # Otherwise, throw a meaningful validation error
+        self._throw_validation_error(
+            username, password, facility, picture_password, qr_login_token
+        )
+
+    def _check_os_user(self, request, username):
+        app_auth_token = request.COOKIES.get(APP_AUTH_TOKEN_COOKIE_NAME)
+        if app_auth_token:
+            try:
+                user = FacilityUser.objects.get_or_create_os_user(app_auth_token)
+                if user is not None and user.username == username:
+                    return user
+            except ValidationError as e:
+                logger.error(e)
+
+    def _throw_validation_error(
+        self,
+        username,
+        password,
+        facility,
+        picture_password=None,
+        qr_login_token=None,
+    ):
+        """
+        Throw a RestValidationError with a helpful error message
+        depending on what went wrong with authentication.
+        """
+        if picture_password is not None:
+            raise RestValidationError(
+                detail={
+                    "picture_password": [
+                        {
+                            "id": error_constants.NOT_FOUND,
+                            "metadata": {
+                                "field": "picture_password",
+                                "message": "No learner found with that picture password.",
+                            },
+                        }
+                    ]
+                }
+            )
+        if qr_login_token is not None:
+            raise RestValidationError(
+                detail={
+                    "qr_login_token": [
+                        {
+                            "id": error_constants.NOT_FOUND,
+                            "metadata": {
+                                "field": "qr_login_token",
+                                "message": "No user found with that QR code.",
+                            },
+                        }
+                    ]
+                }
+            )
+        # Find the FacilityUser we're looking for
+        try:
+            unauthenticated_user = FacilityUser.objects.get(
+                username__iexact=username, facility=facility
+            )
+        except (ValueError, ObjectDoesNotExist):
+            raise RestValidationError(
+                detail={
+                    "username": [
+                        {
+                            "id": error_constants.NOT_FOUND,
+                            "metadata": {
+                                "field": "username",
+                                "message": "Username not found.",
+                            },
+                        }
+                    ]
+                }
+            )
+        except FacilityUser.MultipleObjectsReturned:
+            # Handle case of multiple matching usernames
+            unauthenticated_user = FacilityUser.objects.filter(
+                username__exact=username, facility=facility
+            ).first()
+
+        if unauthenticated_user.password == NOT_SPECIFIED and not hasattr(
+            unauthenticated_user, "os_user"
+        ):
+            # Here - we have a Learner whose password is "NOT_SPECIFIED" because they were created
+            # while the "Require learners to log in with password" setting was disabled - but now
+            # it is enabled again.
+            # Alternatively, they may have been created as an OSUser for automatic login with an
+            # authentication token. If this is the case, then we do not allow for the password to be set.
+            raise RestValidationError(
+                detail={
+                    "password": [
+                        {
+                            "id": error_constants.PASSWORD_NOT_SPECIFIED,
+                            "metadata": {
+                                "field": "password",
+                                "message": "Username is valid, but password needs to be set before login.",
+                            },
+                        }
+                    ]
+                }
+            )
+
+        if (
+            not password
+            and FacilityUser.objects.filter(
+                username__iexact=username, facility=facility
+            ).exists()
+        ):
+            # Password was missing, but username is valid, prompt to give password
+            raise RestValidationError(
+                detail={
+                    "password": [
+                        {
+                            "id": error_constants.MISSING_PASSWORD,
+                            "metadata": {
+                                "field": "password",
+                                "message": "Username is valid, but password is missing.",
+                            },
+                        }
+                    ]
+                }
+            )
+
+        # If no other error message was raised, then throw a generic invalid credentials message
+        raise RestValidationError(
+            detail={
+                "non_field_errors": [
+                    {
+                        "id": error_constants.INVALID_CREDENTIALS,
+                        "metadata": {},
+                    }
+                ]
+            }
+        )
+
+
+@method_decorator([ensure_csrf_cookie], name="dispatch")
+class SessionViewSet(viewsets.ViewSet):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "session_signin"
+
+    def get_throttles(self):
+        if self.action == "create":
+            return super().get_throttles()
+        return []
+
+    def create(self, request):
+        # Only enforce this when running in an app
+        if not allow_other_browsers_to_connect() and not valid_app_key_on_request(
+            request
+        ):
+            return Response(
+                [{"id": error_constants.INVALID_CREDENTIALS, "metadata": {}}],
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        serializer = CreateSessionSerializer(
+            data=request.data, context={"request": request}
+        )
+        if serializer.is_valid():
+            user = serializer.validated_data["user"]
+            if request.query_params.get("prevalidate") == "true":
+                return Response({"full_name": user.full_name})
+            login(request, user)
+            return self.get_session_response(request)
+
+        errors = serializer.errors
+        return self._get_error_response(errors)
+
+    def _get_error_response(self, errors):
+        """
+        Helper method to construct a standardized error response.
+        """
+        error_list = []
+        response_status = status.HTTP_400_BAD_REQUEST
+        for field, field_errors in errors.items():
+            for error in field_errors:
+                error_list.append(error)
+                if (
+                    isinstance(error, dict)
+                    and error.get("id") == error_constants.INVALID_CREDENTIALS
+                ):
+                    response_status = status.HTTP_401_UNAUTHORIZED
+
+        return Response(error_list, status=response_status)
+
+    def destroy(self, request, pk=None):
+        logout(request)
+        return Response([])
+
+    def update(self, request, pk=None):
+        return self.get_session_response(request)
+
+    def get_session_response(self, request):
+        user = request.user
+        session_key = "current"
+        server_time = now()
+        session = user.session_data
+        session.update(
+            {
+                "id": session_key,
+                "server_time": server_time,
+                "app_context": valid_app_key_on_request(request),
+            }
+        )
+
+        visitor_cookie_expiry = now() + timedelta(days=365)
+
+        if isinstance(user, AnonymousUser):
+            response = Response(session)
+            try:
+                visitor_id = request.COOKIES.get("visitor_id")
+                visitor_id = UUID(visitor_id, version=4).hex
+            except (ValueError, TypeError):
+                visitor_id = uuid4().hex
+            response.set_cookie("visitor_id", visitor_id, expires=visitor_cookie_expiry)
+            return response
+        # Set last activity on session to the current time to prevent session timeout
+        # Only do this for logged in users, as anonymous users cannot get logged out!
+        request.session["last_session_request"] = int(time.time())
+        # Default to active, only assume not active when explicitly set.
+        active = request.data.get("active", False)
+
+        # Can only record user session log data for FacilityUsers.
+        if active and isinstance(user, FacilityUser):
+            UserSessionLog.update_log(
+                user,
+                os_info=request.data.get("os"),
+                browser_info=request.data.get("browser"),
+            )
+
+        response = Response(session)
+        return response
+
+
+class _RemoteFacilityUserSearchSerializer(serializers.Serializer):
+    id = serializers.UUIDField(format="hex", allow_null=True)
+    username = serializers.CharField()
+
+
+class RemoteFacilityUserViewset(views.APIView):
+    permission_classes = [IsAuthenticated | NotProvisionedHasPermission]
+
+    def get(self, request):
+        baseurl = request.query_params.get("baseurl", "")
+        username = request.query_params.get("username", None)
+        facility = request.query_params.get("facility", None)
+        if username is None or facility is None:
+            raise RestValidationError(detail="Both username and facility are required")
+        try:
+            client = NetworkClient.build_for_address(baseurl)
+        except NetworkLocationNotFound:
+            raise RestValidationError(detail="Unknown peer: {}".format(baseurl))
+        url = reverse_path("kolibri:core:publicsearchuser-list")
+        try:
+            response = client.get(
+                url, params={"facility": facility, "search": username}
+            )
+            serializer = _RemoteFacilityUserSearchSerializer(
+                data=response.json(), many=True
+            )
+            return Response(serializer.data if serializer.is_valid() else [])
+        except NetworkLocationResponseFailure:
+            return Response([])
+        except Exception as e:
+            raise RestValidationError(detail="Remote user lookup failed") from e
+
+
+class RemoteFacilityUserAuthenticatedViewset(views.APIView):
+    permission_classes = [IsAuthenticated | NotProvisionedHasPermission]
+
+    def post(self, request):
+        """
+        If the request is done by an admin user  it will return a list of the users of the
+        facility
+
+        :param baseurl: First part of the url of the server that's going to be requested
+        :param facility_id: Id of the facility to authenticate and get the list of users
+        :param username: Username of the user that's going to authenticate
+        :param password: Password of the user that's going to authenticate
+        :return: List of the users of the facility.
+        """
+        baseurl = request.data.get("baseurl", "")
+        username = request.data.get("username", None)
+        facility_id = request.data.get("facility_id", None)
+        password = request.data.get("password", None)
+        if username is None or facility_id is None:
+            raise RestValidationError(detail="Both username and facility are required")
+
+        try:
+            facility_info = get_remote_users_info(
+                baseurl, facility_id, username, password
+            )
+        except AuthenticationFailed:
+            raise PermissionDenied()
+        except NetworkLocationNotFound:
+            raise RestValidationError(detail="Unknown peer: {}".format(baseurl))
+
+        user_info = facility_info["user"]
+        roles = user_info["roles"]
+        admin_roles = (user_kinds.ADMIN, user_kinds.SUPERUSER)
+        if not any(role in roles for role in admin_roles):
+            return Response([user_info])
+        return Response(facility_info["users"])

@@ -1,6 +1,6 @@
 {
   "name": "kolibri-build",
-  "version": "1.1.3",
+  "version": "1.1.2",
   "description": "Build tools and webpack configuration for Kolibri",
   "repository": {
     "type": "git",
@@ -15,7 +15,6 @@
     "kolibri-build": "./src/cli.js"
   },
   "dependencies": {
-    "@csstools/postcss-cascade-layers": "6.0.0",
     "@swc/core": "^1.11.29",
     "swc-loader": "^0.2.6",
     "autoprefixer": "10.4.23",
@@ -24,14 +23,13 @@
     "css-loader": "7.1.2",
     "css-minimizer-webpack-plugin": "7.0.4",
     "enhanced-resolve": "^5.20.1",
-    "kolibri": "workspace:*",
     "kolibri-glob": "workspace:*",
     "kolibri-logging": "workspace:*",
     "launch-editor-middleware": "^2.12.0",
     "lodash": "catalog:",
     "mini-css-extract-plugin": "^2.9.4",
     "node-sass": "9.0.0",
-    "postcss-loader": "^8.2.1",
+    "postcss-loader": "^8.2.0",
     "process": "^0.11.10",
     "rtlcss": "4.3.0",
     "sass-loader": "16.0.7",
@@ -43,7 +41,7 @@
     "vue-loader": "^15.11.1",
     "vue-style-loader": "^4.1.3",
     "webpack-cli": "^7.0.2",
-    "webpack-dev-server": "^5.2.5",
+    "webpack-dev-server": "^5.2.4",
     "webpack-merge": "^6.0.1"
   },
   "peerDependencies": {

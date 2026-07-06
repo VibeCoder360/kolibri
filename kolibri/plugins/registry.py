@@ -27,7 +27,6 @@ Everything that a plugin does is expected to be defined through
 
 
 """
-
 import logging
 from importlib import import_module
 
@@ -142,6 +141,7 @@ class Registry:
             app = parse_installed_app_entry(app)
             if app not in self._apps:
                 try:
+
                     initialize_kolibri_plugin(app)
                     # Raise an error here because non-plugins should raise a PluginDoesNotExist exception
                     # if they are properly configured.

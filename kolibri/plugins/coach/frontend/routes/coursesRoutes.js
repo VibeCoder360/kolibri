@@ -2,9 +2,9 @@ import store from 'kolibri/store';
 import { PageNames } from '../constants';
 import CoursesRootPage from '../views/courses/CoursesRootPage.vue';
 import CourseSummaryPage from '../views/courses/CourseSummaryPage.vue';
-import UnitDetailPage from '../views/courses/UnitDetailPage.vue';
 import AssignCourseSidePanel from '../views/courses/sidePanels/AssignCourse/index.vue';
 import CourseDetailsSubpage from '../views/courses/sidePanels/AssignCourse/subpages/CourseDetails.vue';
+import PreviewLearnersSubpage from '../views/courses/sidePanels/AssignCourse/subpages/PreviewLearners.vue';
 import SelectRecipientsSubpage from '../views/courses/sidePanels/AssignCourse/subpages/SelectRecipients.vue';
 import AssignCourseIndexSubpage from '../views/courses/sidePanels/AssignCourse/subpages/AssignCourseIndex.vue';
 import { classIdParamRequiredGuard, RouteSegments, COMPACT_UUID_PATTERN } from './utils';
@@ -86,35 +86,6 @@ export default [
     ],
   },
   {
-    name: PageNames.UNIT_DETAIL,
-    path: CLASS + COURSE_SESSION + `/units/:unitContentnodeId(${COMPACT_UUID_PATTERN})`,
-    component: UnitDetailPage,
-    redirect: to => ({
-      name: PageNames.UNIT_DETAIL_LESSONS,
-      params: to.params,
-    }),
-    handler() {
-      store.dispatch('notLoading');
-    },
-    meta: {
-      titleParts: ['COURSE_NAME', 'CLASS_NAME'],
-    },
-    children: [
-      {
-        name: PageNames.UNIT_DETAIL_LESSONS,
-        path: 'lessons',
-        component: NoRender,
-        meta: { titleParts: ['COURSE_NAME', 'CLASS_NAME'] },
-      },
-      {
-        name: PageNames.UNIT_DETAIL_OBJECTIVES,
-        path: 'objectives',
-        component: NoRender,
-        meta: { titleParts: ['COURSE_NAME', 'CLASS_NAME'] },
-      },
-    ],
-  },
-  {
     name: PageNames.COURSES_ROOT,
     path: OPTIONAL_CLASS + ALL_COURSES,
     component: CoursesRootPage,
@@ -148,6 +119,11 @@ export default [
             name: PageNames.COURSES_ASSIGN_SELECT_RECIPIENTS,
             path: 'select-recipients',
             component: SelectRecipientsSubpage,
+          },
+          {
+            name: PageNames.COURSES_ASSIGN_PREVIEW_LEARNERS,
+            path: 'preview-learners',
+            component: PreviewLearnersSubpage,
           },
         ],
       },

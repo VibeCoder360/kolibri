@@ -18,6 +18,7 @@ from kolibri.core.auth.tasks import cleanupsync
 from kolibri.core.auth.utils.picture_passwords import are_picture_passwords_exhausted
 from kolibri.core.auth.utils.picture_passwords import assign_picture_password
 from kolibri.core.auth.utils.picture_passwords import get_learner_count
+from kolibri.core.auth.utils.qr_tokens import assign_qr_login_token
 from kolibri.plugins.hooks import register_hook
 
 logger = logging.getLogger(__name__)
@@ -69,13 +70,13 @@ class CleanUpTaskOperation(KolibriSyncOperationMixin, LocalOperation):
 
             instance_kwargs = {}
             if context.is_server:
-                instance_kwargs["client_instance_id"] = (
-                    context.sync_session.client_instance_id
-                )
+                instance_kwargs[
+                    "client_instance_id"
+                ] = context.sync_session.client_instance_id
             else:
-                instance_kwargs["server_instance_id"] = (
-                    context.sync_session.server_instance_id
-                )
+                instance_kwargs[
+                    "server_instance_id"
+                ] = context.sync_session.server_instance_id
 
             # ensure the instance ids are strings
             for key, instance_id in instance_kwargs.items():
@@ -109,6 +110,7 @@ class AuthSyncHook(FacilityDataSyncHook):
         single_user_id,
         context,
     ):
+
         if context.is_receiver:
             user_ids = context.transfer_session.get_touched_record_ids_for_model(
                 FacilityUser
@@ -154,3 +156,46 @@ class PicturePasswordsSyncHook(FacilityDataSyncHook):
             except NoAvailableSequences:
                 logger.error("No available picture password sequences remaining.")
                 break
+
+
+@register_hook
+class QRLoginSyncHook(FacilityDataSyncHook):
+    """
+    After a facility-data sync receive, top up QR login tokens for any newly
+    arrived (or pre-existing) eligible learners that are missing one. This
+    mirrors `PicturePasswordsSyncHook` but has no exhaustion concern because
+    the token keyspace is 256 bits.
+
+    No collision operation is registered (unlike picture passwords) because
+    `qr_login_token` is a globally unique column seeded by 256 bits of
+    entropy: the probability of two devices independently generating the
+    same token is astronomically small, and a hard IntegrityError on sync
+    is acceptable in that impossible case.
+    """
+
+    def post_transfer(
+        self,
+        dataset_id,
+        local_is_single_user,
+        remote_is_single_user,
+        single_user_id,
+        context,
+    ):
+        if not context.is_receiver:
+            return
+
+        if local_is_single_user:
+            return
+
+        dataset = FacilityDataset.objects.get(id=dataset_id)
+        if not dataset.enable_qr_login:
+            return
+
+        learners = FacilityUser.objects.filter(
+            dataset_id=dataset_id,
+            roles__isnull=True,
+            qr_login_token__isnull=True,
+        ).exclude(devicepermissions__is_superuser=True)
+
+        for user in learners.iterator():
+            assign_qr_login_token(user)

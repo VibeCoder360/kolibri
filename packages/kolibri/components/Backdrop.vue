@@ -6,7 +6,6 @@
   >
     <div
       class="backdrop"
-      role="presentation"
       :class="{ 'has-transitions': transitions }"
       @click="$emit('click')"
     >

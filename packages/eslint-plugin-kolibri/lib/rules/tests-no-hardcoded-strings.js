@@ -1,5 +1,5 @@
 /**
- * @file Don't allow hardcoded strings in Testing Library queries.
+ * @fileoverview Don't allow hardcoded strings in Testing Library queries.
  */
 
 'use strict';

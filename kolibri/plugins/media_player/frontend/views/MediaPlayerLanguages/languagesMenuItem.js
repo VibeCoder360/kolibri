@@ -3,11 +3,9 @@ import languagesMenuItem from './LanguagesMenuItem.vue';
 
 class LanguagesMenuItem extends mixin(languagesMenuItem) {
   /**
-   * Construct a single language entry, defaulting its label from the underlying text track.
-   * @param {object} player - The video.js player instance.
-   * @param {object} [options] - Configuration for this menu item, forwarded on to the
-   * parent class after the label is defaulted from the track.
-   * @param {TextTrack} options.track - The text track represented by this menu item.
+   * @param {Player} player
+   * @param {Object} options
+   * @param {TextTrack} options.track
    */
   constructor(player, options = {}) {
     const track = options.track;
@@ -19,10 +17,8 @@ class LanguagesMenuItem extends mixin(languagesMenuItem) {
   }
 
   /**
-   * Mount the Vue component for this menu item, passing the localised label and
-   * the language code as props.
-   * @param {object} [options] - Additional options forwarded to the parent component.
-   * @returns {object} The mounted Vue component instance.
+   * @param {Object} [options]
+   * @return {VueComponent}
    */
   createVueComponent(options = {}) {
     return super.createVueComponent(
@@ -39,16 +35,14 @@ class LanguagesMenuItem extends mixin(languagesMenuItem) {
   }
 
   /**
-   * Localise this entry's label, using the locale configured on the player.
-   * @returns {string} The localised label for the menu item.
+   * @return {String}
    */
   getLabel() {
     return this.localize(this.options_.label);
   }
 
   /**
-   * Access the text track this menu item represents.
-   * @returns {TextTrack} The underlying text track.
+   * @return {TextTrack}
    */
   getTrack() {
     return this.options_.track;

@@ -1,9 +1,11 @@
 name: Handle pull request events
-# Disabled on school fork — needs LE Bot secrets. See SCHOOL_FORK_CHANGES.md.
 on:
-  workflow_dispatch:
+  pull_request_target:
+    types: [opened, review_requested, labeled]
+
 permissions:
   contents: read
+
 jobs:
   call-workflow:
     name: Call shared workflow

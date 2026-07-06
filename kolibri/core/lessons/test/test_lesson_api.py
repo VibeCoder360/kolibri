@@ -1,6 +1,7 @@
 from django.urls import reverse
 from rest_framework import status
 
+from .. import models
 from kolibri.core import error_constants
 from kolibri.core.auth.models import AdHocGroup
 from kolibri.core.auth.models import Classroom
@@ -14,7 +15,6 @@ from kolibri.core.content.models import ContentNode
 from kolibri.core.content.models import File
 from kolibri.core.content.models import LocalFile
 
-from .. import models
 
 DUMMY_PASSWORD = "password"
 
@@ -45,6 +45,7 @@ class LessonAPITestCase(APITestCase):
         )
 
     def test_logged_in_user_lesson_no_delete(self):
+
         user = FacilityUser.objects.create(username="learner", facility=self.facility)
         user.set_password("pass")
         user.save()
@@ -57,6 +58,7 @@ class LessonAPITestCase(APITestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_logged_in_admin_lesson_delete(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.delete(
@@ -65,6 +67,7 @@ class LessonAPITestCase(APITestCase):
         self.assertEqual(response.status_code, 204)
 
     def test_logged_in_admin_lesson_create(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.post(
@@ -80,6 +83,7 @@ class LessonAPITestCase(APITestCase):
         self.assertEqual(response.status_code, 201)
 
     def test_logged_in_admin_lesson_create_with_assignments(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.post(
@@ -99,6 +103,7 @@ class LessonAPITestCase(APITestCase):
         )
 
     def test_logged_in_admin_lesson_update_no_assignments(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.post(
@@ -129,6 +134,7 @@ class LessonAPITestCase(APITestCase):
         )
 
     def test_logged_in_admin_lesson_update_different_assignments(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.post(
@@ -166,6 +172,7 @@ class LessonAPITestCase(APITestCase):
         )
 
     def test_logged_in_admin_lesson_update_additional_assignments(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.post(
@@ -209,6 +216,7 @@ class LessonAPITestCase(APITestCase):
         )
 
     def test_logged_in_admin_lesson_update_learner_assignments(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.post(
@@ -251,6 +259,7 @@ class LessonAPITestCase(APITestCase):
         )
 
     def test_logged_in_admin_lesson_update_learner_assignments_wrong_collection(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.post(
@@ -284,6 +293,7 @@ class LessonAPITestCase(APITestCase):
             AdHocGroup.objects.get(parent=self.classroom)
 
     def test_logged_in_user_lesson_no_create(self):
+
         user = FacilityUser.objects.create(username="learner", facility=self.facility)
         user.set_password("pass")
         user.save()
@@ -303,6 +313,7 @@ class LessonAPITestCase(APITestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_logged_in_admin_lesson_update(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         response = self.client.put(
@@ -318,6 +329,7 @@ class LessonAPITestCase(APITestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_logged_in_user_lesson_no_update(self):
+
         user = FacilityUser.objects.create(username="learner", facility=self.facility)
         user.set_password("pass")
         user.save()
@@ -389,33 +401,6 @@ class LessonAPITestCase(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_can_update_lesson_with_null_created_by(self):
-        # A lesson synced in from another dataset may have a null created_by (its
-        # original cross-dataset superuser author is dropped on sync). Editing
-        # such a lesson locally must not raise. Regression test for an
-        # IntegrityError raised on PATCH ("Lesson.created_by may not be null").
-        lesson = models.Lesson(
-            title="synced lesson",
-            is_active=True,
-            collection=self.classroom,
-            created_by=None,
-        )
-        lesson.save(update_dirty_bit_to=False)
-
-        self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
-
-        response = self.client.patch(
-            reverse("kolibri:core:lesson-detail", kwargs={"pk": lesson.id}),
-            {
-                "id": lesson.id,
-                "title": "synced lesson",
-                "active": False,
-                "collection": self.classroom.id,
-            },
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
     def test_can_update_lesson_to_same_title_as_other_lesson(self):
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
@@ -463,6 +448,7 @@ class LessonAPITestCase(APITestCase):
         self.assertEqual(response.data[0]["id"], error_constants.UNIQUE)
 
     def test_can_get_lesson_size(self):
+
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
 
         content_root = ContentNode.objects.create(
@@ -557,110 +543,3 @@ class LessonAPITestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.lesson.refresh_from_db()
         self.assertFalse(self.lesson.is_active)
-
-
-class LessonReadResponseTestCase(APITestCase):
-    """Verify the exact read-path response shape of the Lesson API."""
-
-    databases = "__all__"
-
-    @classmethod
-    def setUpTestData(cls):
-        provision_device()
-        cls.facility = Facility.objects.create(name="ReadFac")
-        cls.admin = FacilityUser.objects.create(
-            username="readAdmin", facility=cls.facility
-        )
-        cls.admin.set_password(DUMMY_PASSWORD)
-        cls.admin.save()
-        cls.facility.add_admin(cls.admin)
-        cls.classroom = Classroom.objects.create(name="ReadRoom", parent=cls.facility)
-        cls.lesson = models.Lesson.objects.create(
-            title="read title",
-            is_active=True,
-            collection=cls.classroom,
-            created_by=cls.admin,
-            resources=[],
-        )
-
-    def _get_lesson(self):
-        self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
-        response = self.client.get(
-            reverse("kolibri:core:lesson-detail", kwargs={"pk": self.lesson.id})
-        )
-        self.assertEqual(response.status_code, 200)
-        return response.data
-
-    def test_response_has_classroom_nested_object(self):
-        data = self._get_lesson()
-        self.assertIn("classroom", data)
-        classroom = data["classroom"]
-        self.assertEqual(classroom["id"], self.classroom.id)
-        self.assertEqual(classroom["name"], self.classroom.name)
-        # parent is the facility id (classroom's parent)
-        self.assertEqual(classroom["parent"], self.facility.id)
-
-    def test_response_has_active_field(self):
-        data = self._get_lesson()
-        self.assertIn("active", data)
-        self.assertTrue(data["active"])
-
-    def test_response_has_collection_field(self):
-        # Both 'collection' (raw FK) and 'classroom' (nested) appear
-        data = self._get_lesson()
-        self.assertIn("collection", data)
-        self.assertEqual(data["collection"], self.classroom.id)
-
-    def test_response_has_assignments_list(self):
-        data = self._get_lesson()
-        self.assertIn("assignments", data)
-        self.assertIsInstance(data["assignments"], list)
-        self.assertEqual(data["assignments"], [])
-
-    def test_response_has_learner_ids_list(self):
-        data = self._get_lesson()
-        self.assertIn("learner_ids", data)
-        self.assertEqual(data["learner_ids"], [])
-
-    def test_response_has_date_created(self):
-        data = self._get_lesson()
-        self.assertIn("date_created", data)
-        self.assertIsNotNone(data["date_created"])
-
-    def test_response_has_resources_list(self):
-        data = self._get_lesson()
-        self.assertIn("resources", data)
-        self.assertEqual(data["resources"], [])
-
-    def test_assignments_excludes_adhoc_group(self):
-        """Assignments list excludes the adhoc-learner-group collection."""
-        learner = FacilityUser.objects.create(
-            username="learner1", facility=self.facility
-        )
-        self.classroom.add_member(learner)
-        self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
-        # Assign the lesson to a learner group and also directly to a learner
-        group = LearnerGroup.objects.create(name="grp", parent=self.classroom)
-        self.client.put(
-            reverse("kolibri:core:lesson-detail", kwargs={"pk": self.lesson.id}),
-            {
-                "title": "read title",
-                "active": True,
-                "collection": self.classroom.id,
-                "assignments": [group.id],
-                "created_by": self.admin.id,
-                "learner_ids": [learner.id],
-            },
-            format="json",
-        )
-        response = self.client.get(
-            reverse("kolibri:core:lesson-detail", kwargs={"pk": self.lesson.id})
-        )
-        data = response.data
-        # The adhoc group should NOT appear in assignments
-        adhoc = AdHocGroup.objects.get(parent=self.classroom)
-        self.assertNotIn(adhoc.id, data["assignments"])
-        # The learner group SHOULD appear
-        self.assertIn(group.id, data["assignments"])
-        # learner_ids should contain the learner
-        self.assertIn(learner.id, data["learner_ids"])

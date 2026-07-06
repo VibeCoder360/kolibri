@@ -3,7 +3,6 @@ Implements custom auth backends as described in the Django docs, for our custom 
 The appropriate classes should be listed in the AUTHENTICATION_BACKENDS. Note that authentication
 backends are checked in the order they're listed.
 """
-
 import abc
 import logging
 
@@ -18,6 +17,7 @@ from kolibri.core.auth.models import FacilityUser
 from kolibri.core.auth.models import Role
 from kolibri.core.auth.models import Session
 from kolibri.core.device.utils import is_full_facility_import
+
 
 FACILITY_CREDENTIAL_KEY = "facility"
 logger = logging.getLogger(__name__)
@@ -194,6 +194,37 @@ class PicturePasswordAuthScope(FacilityAuthScope):
         )
 
 
+class QRTokenAuthScope(FacilityAuthScope):
+    """Auth scope for QR code (token) authentication"""
+
+    def __init__(self, facility_or_id, qr_login_token=None):
+        super().__init__(facility_or_id)
+        self.qr_login_token = qr_login_token
+
+    def get_queryset(self):
+        # `qr_login_token` is globally unique, but we scope by dataset for
+        # defense-in-depth: a token issued in facility A must not log into
+        # facility B even if it somehow leaked across facilities.
+        return super().get_queryset().filter(qr_login_token=self.qr_login_token)
+
+    def iter_candidate_users(self):
+        """
+        We expect exactly one user with this token (globally unique column).
+        """
+        for user in self.get_queryset():
+            yield user
+
+    def matches_credentials(self, user):
+        """
+        Validates that the user's facility has QR login enabled. Unlike
+        picture passwords, QR tokens are not learner-only: coaches, admins,
+        and superusers may hold one, but only by explicit opt-in via the ID
+        cards API (learners are the only users assigned tokens
+        automatically), so no role or superuser check is applied here.
+        """
+        return user.dataset.enable_qr_login
+
+
 class FacilityUserBackend:
     """
     A class that implements authentication for FacilityUsers.
@@ -209,10 +240,12 @@ class FacilityUserBackend:
         :param kwargs: a dict of additional credentials (see `keyword`s)
         :keyword facility: a Facility object or facility pk
         :keyword picture_password: a dot-separated picture sequence string
+        :keyword qr_login_token: a QR code login token string
         :return: A FacilityUser instance if successful, or None if authentication failed.
         """
         facility = kwargs.get(FACILITY_CREDENTIAL_KEY, None)
         picture_password = kwargs.get("picture_password", None)
+        qr_login_token = kwargs.get("qr_login_token", None)
 
         scopes = []
 
@@ -224,6 +257,13 @@ class FacilityUserBackend:
                 # we cannot run picture password auth without it
                 raise PermissionDenied("Invalid credentials")
             scopes.append(PicturePasswordAuthScope(facility, picture_password))
+        elif qr_login_token is not None:
+            # QR token authentication path. Same isolation rule as picture
+            # password: a failed QR attempt must never fall through to
+            # username/password. Facility is required for the dataset scope.
+            if not facility:
+                raise PermissionDenied("Invalid credentials")
+            scopes.append(QRTokenAuthScope(facility, qr_login_token))
         else:
             if facility:
                 scopes.append(BasicUserAuthScope(facility, username, password))

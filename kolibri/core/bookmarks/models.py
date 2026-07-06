@@ -8,6 +8,7 @@ from kolibri.core.auth.permissions.general import IsOwn
 
 
 class Bookmark(AbstractFacilityDataModel):
+
     content_id = UUIDField(blank=True, null=True)
     channel_id = UUIDField(blank=True, null=True)
     contentnode_id = UUIDField()

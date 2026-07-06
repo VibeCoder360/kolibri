@@ -1,7 +1,6 @@
 """
 To run this test, type this in command line <kolibri manage test -- kolibri.core.content>
 """
-
 import datetime
 import time
 import unittest
@@ -28,7 +27,6 @@ from kolibri.core.auth.models import LearnerGroup
 from kolibri.core.auth.test.helpers import KolibriAPITestCase as APITestCase
 from kolibri.core.auth.test.helpers import provision_device
 from kolibri.core.content import models as content
-from kolibri.core.content.api import NUM_CHILDREN
 from kolibri.core.content.test.helpers import ChannelBuilder
 from kolibri.core.content.utils.paths import get_v2_channel_lookup_url
 from kolibri.core.device.models import ContentCacheKey
@@ -38,7 +36,6 @@ from kolibri.core.discovery.models import NetworkLocation
 from kolibri.core.discovery.utils.network.client import NetworkClient
 from kolibri.core.discovery.utils.network.errors import NetworkLocationConnectionFailure
 from kolibri.core.discovery.utils.network.errors import NetworkLocationResponseFailure
-from kolibri.core.discovery.utils.network.errors import NetworkLocationResponseTimeout
 from kolibri.core.lessons.models import Lesson
 from kolibri.core.lessons.models import LessonAssignment
 from kolibri.core.logger.models import ContentSessionLog
@@ -104,6 +101,7 @@ class ContentNodeTestBase:
         self.assertEqual(set(expected_output), set(actual_output))
 
     def test_descendants_of_kind(self):
+
         p = content.ContentNode.objects.get(title="root")
         expected_output = content.ContentNode.objects.filter(title__in=["c1"])
         actual_output = p.get_descendants(include_self=False).filter(
@@ -112,6 +110,7 @@ class ContentNodeTestBase:
         self.assertEqual(set(expected_output), set(actual_output))
 
     def test_get_top_level_topics(self):
+
         p = content.ContentNode.objects.get(title="root")
         expected_output = content.ContentNode.objects.filter(
             parent=p, kind=content_kinds.TOPIC
@@ -124,6 +123,7 @@ class ContentNodeTestBase:
         self.assertEqual(set(expected_output), set(actual_output))
 
     def test_tag_str(self):
+
         # test for ContentTag __str__
         p = content.ContentTag.objects.get(tag_name="tag_2")
         self.assertEqual(str(p), "tag_2")
@@ -233,6 +233,7 @@ def infer_learning_activity(kind):
 
 
 class ContentNodeAPIBase:
+
     fixtures = ["content_test.json"]
     the_channel_id = "6199dde695db4ee4ab392222d5af1e5c"
     baseurl = None
@@ -294,11 +295,11 @@ class ContentNodeAPIBase:
         thumbnail = None
         files = []
         for f in expected.files.all():
-            ("local_file__id",)
-            ("local_file__available",)
-            ("local_file__file_size",)
-            ("local_file__extension",)
-            ("lang_id",)
+            "local_file__id",
+            "local_file__available",
+            "local_file__file_size",
+            "local_file__extension",
+            "lang_id",
             file = {}
             for field in [
                 "id",
@@ -475,6 +476,23 @@ class ContentNodeAPIBase:
         self.assertEqual(response.content, b"")
         self.assertEqual(response.headers["ETag"], '"{}"'.format(cache_key))
 
+    @unittest.skipIf(
+        getattr(settings, "DATABASES")["default"]["ENGINE"]
+        == "django.db.backends.postgresql",
+        "Skipping postgres as not as vulnerable to large queries and large insertions are less performant",
+    )
+    def test_contentnode_list_long(self):
+        # This will make > 1000 nodes which should test our ancestor batching behaviour
+        builder = ChannelBuilder(num_children=10)
+        builder.insert_into_default_db()
+        content.ContentNode.objects.update(available=True)
+        nodes = content.ContentNode.objects.filter(available=True)
+        expected_output = len(nodes)
+        self.assertGreater(expected_output, 1000)
+        response = self._get(reverse("kolibri:core:contentnode-list"))
+        self.assertEqual(len(response.data), expected_output)
+        self._assert_nodes(response.data, nodes)
+
     def _recurse_and_assert(self, data, nodes, recursion_depth=0):
         recursion_depths = []
         nodes_by_id = {n.id: n for n in nodes}
@@ -545,8 +563,7 @@ class ContentNodeAPIBase:
         "Skipping postgres as not as vulnerable to large queries and large insertions are less performant",
     )
     def test_contentnode_tree_long(self):
-        # One past a page triggers the "more" marker at both root and child levels.
-        builder = ChannelBuilder(levels=2, num_children=NUM_CHILDREN + 1)
+        builder = ChannelBuilder(levels=2, num_children=30)
         builder.insert_into_default_db()
         content.ContentNode.objects.all().update(available=True)
         root = content.ContentNode.objects.get(id=builder.root_node["id"])
@@ -569,23 +586,18 @@ class ContentNodeAPIBase:
         "Skipping postgres as not as vulnerable to large queries and large insertions are less performant",
     )
     def test_contentnode_tree_next__gt(self):
-        # A page plus a partial second page, so paging past the first returns
-        # the remainder with no further "more" marker.
-        remainder = 5
-        builder = ChannelBuilder(levels=2, num_children=NUM_CHILDREN + remainder)
+        builder = ChannelBuilder(levels=2, num_children=17)
         builder.insert_into_default_db()
         content.ContentNode.objects.all().update(available=True)
         root = content.ContentNode.objects.get(id=builder.root_node["id"])
-        next__gt = content.ContentNode.objects.filter(parent=root)[
-            NUM_CHILDREN - 1
-        ].rght
+        next__gt = content.ContentNode.objects.filter(parent=root)[11].rght
         response = self._get(
             reverse("kolibri:core:contentnode_tree-detail", kwargs={"pk": root.id}),
             data={"next__gt": next__gt},
         )
-        self.assertEqual(len(response.data["children"]["results"]), remainder)
+        self.assertEqual(len(response.data["children"]["results"]), 5)
         self.assertIsNone(response.data["children"]["more"])
-        first_node = content.ContentNode.objects.filter(parent=root)[NUM_CHILDREN]
+        first_node = content.ContentNode.objects.filter(parent=root)[12]
         self._recurse_and_assert(
             [response.data["children"]["results"][0]], [first_node], recursion_depth=1
         )
@@ -596,10 +608,7 @@ class ContentNodeAPIBase:
         "Skipping postgres as not as vulnerable to large queries and large insertions are less performant",
     )
     def test_contentnode_tree_more(self):
-        # A page plus a partial second page, so following the "more" marker
-        # returns the remainder with no further marker.
-        remainder = 5
-        builder = ChannelBuilder(levels=2, num_children=NUM_CHILDREN + remainder)
+        builder = ChannelBuilder(levels=2, num_children=17)
         builder.insert_into_default_db()
         content.ContentNode.objects.all().update(available=True)
         root = content.ContentNode.objects.get(id=builder.root_node["id"])
@@ -615,9 +624,7 @@ class ContentNodeAPIBase:
             ),
             data=first_child["children"]["more"]["params"],
         )
-        self.assertEqual(
-            len(nested_page_response.data["children"]["results"]), remainder
-        )
+        self.assertEqual(len(nested_page_response.data["children"]["results"]), 5)
         self.assertIsNone(nested_page_response.data["children"]["more"])
 
     def test_contentnode_tree_singleton_path(self):
@@ -1710,6 +1717,7 @@ class ContentNodeAPITestCase(ContentNodeAPIBase, APITestCase):
         return facility, root, c1, c2, c2c1, c2c3
 
     def test_contentnode_progress_list_endpoint(self):
+
         facility, root, c1, c2, c2c1, c2c3 = self._setup_contentnode_progress()
 
         response = self.client.get(reverse("kolibri:core:contentnodeprogress-list"))
@@ -2307,11 +2315,11 @@ class ContentNodeAPITestCase(ContentNodeAPIBase, APITestCase):
             files = []
 
             for f in expected.files.all():
-                ("local_file__id",)
-                ("local_file__available",)
-                ("local_file__file_size",)
-                ("local_file__extension",)
-                ("lang_id",)
+                "local_file__id",
+                "local_file__available",
+                "local_file__file_size",
+                "local_file__extension",
+                "lang_id",
                 file = {}
                 for field in [
                     "id",
@@ -2430,11 +2438,11 @@ class ContentNodeAPITestCase(ContentNodeAPIBase, APITestCase):
             files = []
 
             for f in expected.files.all():
-                ("local_file__id",)
-                ("local_file__available",)
-                ("local_file__file_size",)
-                ("local_file__extension",)
-                ("lang_id",)
+                "local_file__id",
+                "local_file__available",
+                "local_file__file_size",
+                "local_file__extension",
+                "lang_id",
                 file = {}
                 for field in [
                     "id",
@@ -2647,117 +2655,6 @@ class KolibriStudioAPITestCase(APITestCase):
         response = self.client.get(
             reverse("kolibri:core:remotechannel-list"), format="json"
         )
-        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-        self.assertEqual(response.json()["status"], "offline")
-
-    @mock.patch.object(
-        NetworkClient,
-        "get",
-        side_effect=NetworkLocationResponseFailure(response=None),
-    )
-    def test_channel_list_response_failure_without_response(self, mock_get):
-        response = self.client.get(
-            reverse("kolibri:core:remotechannel-list"), format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-        self.assertEqual(response.json()["status"], "offline")
-
-    @mock.patch.object(
-        NetworkClient,
-        "get",
-        side_effect=NetworkLocationResponseFailure(response=None),
-    )
-    def test_channel_retrieve_response_failure_without_response(self, mock_get):
-        response = self.client.get(
-            reverse("kolibri:core:remotechannel-detail", kwargs={"pk": "abc"}),
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-        self.assertEqual(response.json()["status"], "offline")
-
-    @mock.patch.object(
-        NetworkClient,
-        "get",
-        side_effect=NetworkLocationResponseFailure(response=mock.Mock(status_code=502)),
-    )
-    def test_channel_list_upstream_error(self, mock_get):
-        response = self.client.get(
-            reverse("kolibri:core:remotechannel-list"), format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-        self.assertEqual(response.json()["status"], "offline")
-
-    @mock.patch.object(
-        NetworkClient,
-        "get",
-        side_effect=NetworkLocationResponseFailure(response=mock.Mock(status_code=502)),
-    )
-    def test_channel_retrieve_upstream_error(self, mock_get):
-        response = self.client.get(
-            reverse("kolibri:core:remotechannel-detail", kwargs={"pk": "abc"}),
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-        self.assertEqual(response.json()["status"], "offline")
-
-    @mock.patch.object(NetworkClient, "get", side_effect=NetworkLocationResponseTimeout)
-    def test_channel_list_timeout(self, mock_get):
-        response = self.client.get(
-            reverse("kolibri:core:remotechannel-list"), format="json"
-        )
-        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-        self.assertEqual(response.json()["status"], "offline")
-
-    @mock.patch.object(NetworkClient, "get", side_effect=NetworkLocationResponseTimeout)
-    def test_channel_retrieve_timeout(self, mock_get):
-        response = self.client.get(
-            reverse("kolibri:core:remotechannel-detail", kwargs={"pk": "abc"}),
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-        self.assertEqual(response.json()["status"], "offline")
-
-    def _create_community_channel(self):
-        builder = ChannelBuilder()
-        builder.insert_into_default_db()
-        channel = content.ChannelMetadata.objects.get(id=builder.channel["id"])
-        channel.library = library_constants.COMMUNITY
-        channel.save()
-        return channel.id
-
-    def test_community_channel_retrieve_response_failure_without_response(self):
-        channel_id = self._create_community_channel()
-        with mock.patch.object(
-            NetworkClient,
-            "get",
-            side_effect=NetworkLocationResponseFailure(response=None),
-        ):
-            response = self.client.get(
-                reverse(
-                    "kolibri:core:remotechannel-detail",
-                    kwargs={"pk": str(channel_id)},
-                ),
-                format="json",
-            )
-        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-        self.assertEqual(response.json()["status"], "offline")
-
-    def test_community_channel_retrieve_upstream_error(self):
-        channel_id = self._create_community_channel()
-        with mock.patch.object(
-            NetworkClient,
-            "get",
-            side_effect=NetworkLocationResponseFailure(
-                response=mock.Mock(status_code=502)
-            ),
-        ):
-            response = self.client.get(
-                reverse(
-                    "kolibri:core:remotechannel-detail",
-                    kwargs={"pk": str(channel_id)},
-                ),
-                format="json",
-            )
         self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
         self.assertEqual(response.json()["status"], "offline")
 

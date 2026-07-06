@@ -2,7 +2,6 @@
 Avoiding direct model imports in here so that we can import these functions into places
 that should not initiate the Django app registry.
 """
-
 import hashlib
 
 try:
@@ -25,8 +24,8 @@ from le_utils.constants.labels.learning_activities import LEARNINGACTIVITIESLIST
 from le_utils.constants.labels.levels import LEVELSLIST
 from le_utils.constants.labels.needs import NEEDSLIST
 from le_utils.constants.labels.subjects import SUBJECTSLIST
-
 from kolibri.core.utils.cache import process_cache as cache
+
 
 metadata_lookup = {
     "learning_activities": LEARNINGACTIVITIESLIST,
@@ -57,7 +56,7 @@ for key, labels in metadata_lookup.items():
             info = {
                 "bitmask_field_name": bitmask_field_name,
                 "field_name": key,
-                "bits": 2**j,
+                "bits": 2 ** j,
                 "label": label,
             }
             bitmask_lookup[label] = info
@@ -100,7 +99,7 @@ class SQLiteBitwiseORAggregate(Aggregate):
     @property
     def template(self):
         return " + ".join(
-            "max(%(expressions)s&{})".format(2**i) for i in range(0, self.num_bits)
+            "max(%(expressions)s&{})".format(2 ** i) for i in range(0, self.num_bits)
         )
 
 
@@ -170,7 +169,7 @@ def annotate_label_bitmasks(queryset):
 
 
 def annotate_modality(queryset):
-    """Update queryset to annotate `modality` field based on `options.modality`"""
+    """ Update queryset to annotate `modality` field based on `options.modality` """
     queryset = queryset.filter(options__contains='"modality":')
 
     when_statements = [

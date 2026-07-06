@@ -4,6 +4,7 @@ from django.db import models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("logger", "0007_contentsessionlog_visitor_id"),
     ]

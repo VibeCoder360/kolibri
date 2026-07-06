@@ -1,4 +1,6 @@
 export default (widget, rubric) => {
-  // Transformer scoring checks the transformations against rubric.correct
-  widget.props.handleUserInput(rubric.correct);
+  const transformations = rubric.correct.transformations;
+  widget.setTransformationProps(transformations, () => {
+    widget.setTransformations(transformations);
+  });
 };

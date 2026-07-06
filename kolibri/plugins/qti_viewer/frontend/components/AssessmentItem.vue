@@ -22,13 +22,14 @@
   import TextEntryInteraction from './interactions/TextEntryInteraction.vue';
 
   /**
-   * Extract QTI declarations of a specific type from an XML document.
-   * @param {Document} xmlDocument - The QTI XML document.
-   * @param {string} declarationType - 'response', 'outcome', or 'context'.
-   * @param {Function} interactionHandler - A function called when a variable value is set.
-   * @returns {object} Map of identifier to QTIVariable.
+   * Extract QTI declarations of a specific type from an XML document
+   * @param {Document} xmlDocument - The QTI XML document
+   * @param {string} declarationType - 'response', 'outcome', or 'context'
+   * @param {Function} interactionHandler - a function that is called when a variable value is set
+   * @param {Ref{Object}} injectedAnswerState - a computed ref that contains any injected answers
+   * @returns {Object} Map of identifier -> QTIVariable
    */
-  function getQTIDeclarations(xmlDocument, declarationType, interactionHandler) {
+  function getQTIDeclarations(xmlDocument, declarationType, interactionHander) {
     const declarations = {};
 
     const selector = `qti-${declarationType}-declaration`;
@@ -36,7 +37,7 @@
     const nodes = xmlDocument.querySelectorAll(selector);
 
     for (const node of nodes) {
-      const variable = new QTIVariable(node, interactionHandler);
+      const variable = new QTIVariable(node, interactionHander);
       declarations[variable.identifier] = variable;
     }
     return declarations;

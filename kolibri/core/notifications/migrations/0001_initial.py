@@ -8,6 +8,7 @@ import kolibri.utils.time_utils
 
 
 class Migration(migrations.Migration):
+
     initial = True
 
     dependencies = []

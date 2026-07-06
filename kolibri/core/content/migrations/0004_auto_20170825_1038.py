@@ -10,6 +10,7 @@ import kolibri.core.fields
 
 
 class Migration(migrations.Migration):
+
     dependencies = [("content", "0003_auto_20170607_1212")]
 
     operations = [

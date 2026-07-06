@@ -1,33 +1,9 @@
 import { UserKinds } from 'kolibri/constants';
 import { registerNavItem } from 'kolibri/composables/useNav';
 import urls from 'kolibri/urls';
-import { createTranslator } from 'kolibri/utils/i18n';
+import { coreStrings } from 'kolibri/uiText/commonCoreStrings';
+import { qrLoginStrings } from 'kolibri-common/strings/qrLoginStrings';
 import baseRoutes from '../baseRoutes';
-
-const navStrings = createTranslator('FacilityManagementSideNavEntryStrings', {
-  classesLabel: {
-    message: 'Classes',
-    context:
-      'In the classes section of Kolibri users can view the list of all the classes in their facility, with the number of enrolled users for each class, and the coaches assigned.',
-  },
-  usersLabel: {
-    message: 'Users',
-    context:
-      'A user is any person who has access to a facility in Kolibri. There are four main types of users in Kolibri: Learners, Coaches, Admins and Super admins.',
-  },
-  settingsLabel: {
-    message: 'Settings',
-    context: "Title of tab used in 'Facility' and 'Device' sections.",
-  },
-  dataLabel: {
-    message: 'Data',
-    context: "Title of tab in 'Facility' section.",
-  },
-  facilityLabel: {
-    message: 'Facility',
-    context: 'A facility is a center of education, such as a school.',
-  },
-});
 
 registerNavItem({
   get url() {
@@ -36,25 +12,31 @@ registerNavItem({
   get routes() {
     return [
       {
-        label: navStrings.$tr('classesLabel'),
+        label: coreStrings.$tr('classesLabel'),
         route: baseRoutes.classes.path,
         icon: 'classes',
         name: baseRoutes.classes.name,
       },
       {
-        label: navStrings.$tr('usersLabel'),
+        label: coreStrings.$tr('usersLabel'),
         route: baseRoutes.users.path,
         icon: 'people',
         name: baseRoutes.users.name,
       },
       {
-        label: navStrings.$tr('settingsLabel'),
+        label: qrLoginStrings.idCards$(),
+        route: baseRoutes.idCards.path,
+        icon: 'people',
+        name: baseRoutes.idCards.name,
+      },
+      {
+        label: coreStrings.$tr('settingsLabel'),
         route: baseRoutes.settings.path,
         icon: 'settings',
         name: baseRoutes.settings.name,
       },
       {
-        label: navStrings.$tr('dataLabel'),
+        label: coreStrings.$tr('dataLabel'),
         route: baseRoutes.data.path,
         icon: 'save',
         name: baseRoutes.data.name,
@@ -62,7 +44,7 @@ registerNavItem({
     ];
   },
   get label() {
-    return navStrings.$tr('facilityLabel');
+    return coreStrings.$tr('facilityLabel');
   },
   icon: 'facility',
   role: UserKinds.ADMIN,

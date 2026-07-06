@@ -4,6 +4,7 @@ from django.db import models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [("exams", "0002_update_exam_data_model")]
 
     operations = [

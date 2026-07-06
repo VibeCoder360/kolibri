@@ -42,7 +42,6 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 """
-
 import os
 import sys
 import time
@@ -51,6 +50,7 @@ from kolibri.utils.pskolibri.common import LINUX
 from kolibri.utils.pskolibri.common import memoize_when_activated
 from kolibri.utils.pskolibri.common import NoSuchProcess
 from kolibri.utils.pskolibri.common import WINDOWS
+
 
 _TOTAL_PHYMEM = None
 _timer = getattr(time, "monotonic", time.time)

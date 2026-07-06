@@ -88,6 +88,7 @@ describe('picture password row', () => {
   } = {}) {
     useUser.mockImplementation(() =>
       useUserMock({
+        userKind,
         isLearner: userKind === UserKinds.LEARNER,
         isCoach: userKind === UserKinds.COACH,
         isAdmin: userKind === UserKinds.ADMIN || userKind === UserKinds.SUPERUSER,
@@ -212,4 +213,88 @@ describe('picture password row', () => {
       expect(screen.getByText(changePasswordPrompt$())).toBeVisible();
     },
   );
+});
+
+describe('QR login row', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    useOnMyOwnSetup.mockImplementation(() => useOnMyOwnSetupMock({ onMyOwnSetup: false }));
+    useKResponsiveWindow.mockImplementation(() => ({ windowIsSmall: false }));
+    useFacilities.mockImplementation(() => useFacilitiesMock({ facilities: ref([]) }));
+  });
+
+  async function renderProfile({
+    userKind = UserKinds.LEARNER,
+    enableQrLogin = true,
+    qrLoginToken = null,
+  } = {}) {
+    useUser.mockImplementation(() =>
+      useUserMock({
+        userKind,
+        currentUserId: 'user-1',
+        isLearner: userKind === UserKinds.LEARNER,
+        isCoach: userKind === UserKinds.COACH,
+        isAdmin: userKind === UserKinds.ADMIN || userKind === UserKinds.SUPERUSER,
+        isSuperuser: userKind === UserKinds.SUPERUSER,
+      }),
+    );
+    useFacility.mockImplementation(() =>
+      useFacilityMock({
+        facilityConfig: ref({
+          enable_qr_login: enableQrLogin,
+          learner_can_edit_password: false,
+        }),
+      }),
+    );
+    FacilityUserResource.fetchModel = jest
+      .fn()
+      .mockResolvedValue({ id: 'user-1', qr_login_token: qrLoginToken });
+    FacilityUserResource.assignQrToken = jest
+      .fn()
+      .mockResolvedValue({ data: { qr_login_token: 'x'.repeat(43) } });
+
+    const localRouter = new VueRouter();
+    localRouter.getRoute = () => '/';
+
+    return render(ProfilePage, {
+      store: makeStore(),
+      routes: localRouter,
+    });
+  }
+
+  it.each([UserKinds.LEARNER, UserKinds.COACH, UserKinds.ADMIN, UserKinds.SUPERUSER])(
+    'shows a Generate QR code action for a %s without a token',
+    async userKind => {
+      await renderProfile({ userKind });
+
+      expect(await screen.findByTestId('generate-qr-token')).toBeVisible();
+      expect(screen.queryByTestId('qr-login-token-display')).not.toBeInTheDocument();
+    },
+  );
+
+  it('generates and displays a token when the action is clicked', async () => {
+    await renderProfile({ userKind: UserKinds.COACH });
+
+    const button = await screen.findByTestId('generate-qr-token');
+    button.click();
+
+    expect(await screen.findByTestId('qr-login-token-display')).toBeInTheDocument();
+    expect(FacilityUserResource.assignQrToken).toHaveBeenCalledWith('user-1');
+    expect(screen.queryByTestId('generate-qr-token')).not.toBeInTheDocument();
+  });
+
+  it('displays the existing token without a generate action', async () => {
+    await renderProfile({ userKind: UserKinds.ADMIN, qrLoginToken: 'a'.repeat(43) });
+
+    expect(await screen.findByTestId('qr-login-token-display')).toBeInTheDocument();
+    expect(screen.queryByTestId('generate-qr-token')).not.toBeInTheDocument();
+  });
+
+  it('omits the QR row when QR login is disabled for the facility', async () => {
+    await renderProfile({ userKind: UserKinds.LEARNER, enableQrLogin: false });
+
+    await screen.findByText(fullNameLabel$());
+    expect(screen.queryByTestId('qr-login-token-display')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('generate-qr-token')).not.toBeInTheDocument();
+  });
 });

@@ -10,7 +10,6 @@ module?
 
 Anyways, for now to get hooks started, we have some defined here...
 """
-
 from abc import abstractmethod
 
 from django.utils.safestring import mark_safe

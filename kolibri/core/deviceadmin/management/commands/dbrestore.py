@@ -6,17 +6,17 @@ from django.core.management.base import BaseCommand
 from django.core.management.base import CommandError
 
 import kolibri
-from kolibri.utils import server
-
 from ...utils import dbrestore
 from ...utils import default_backup_folder
 from ...utils import get_dtm_from_backup_name
 from ...utils import search_latest
+from kolibri.utils import server
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
+
     output_transaction = True
 
     # @ReservedAssignment
@@ -61,7 +61,7 @@ class Command(BaseCommand):
         """
         use_backup = None
         # Ultimately, we are okay about a backup from a minor release
-        fallback_version = ".".join(kolibri.__version__.split(".")[:2])
+        fallback_version = ".".join(map(str, kolibri.VERSION[:2]))
         if os.path.exists(dumps_root):
             use_backup = search_latest(dumps_root, fallback_version)
         if not use_backup:

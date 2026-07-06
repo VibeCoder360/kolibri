@@ -8,10 +8,11 @@ import { waitForTaskToComplete } from '../manageContent/utils';
 import { getChannelWithContentSizes } from './apiChannelMetadata';
 
 /**
- * Makes a request to the RemoteChannel API with a token. Does not actually interact with
- * the Vuex store.
- * @param {string} token - The channel token to look up.
- * @returns {Promise<object>} Resolves with the remote channel object.
+ * Makes request to RemoteChannel API with a token. Does not actually interact
+ * with Vuex store.
+ *
+ * @param {string} token -
+ * @returns Promise
  */
 export function getRemoteChannelByToken(token) {
   return RemoteChannelResource.fetchModel({ id: token, force: true });
@@ -24,13 +25,10 @@ export function getRemoteChannelBundleByToken(token) {
 }
 
 /**
- * Starts a task that downloads a Channel Metadata database.
+ * Starts Task that downloads a Channel Metadata database.
+ * NOTE: cannot be normally dispatched as an action, since it uses
+ * waitForTaskToComplete (which relies on the store singleton with a .watch method)
  *
- * NOTE: cannot be normally dispatched as an action, since it uses `waitForTaskToComplete`
- * (which relies on the store singleton with a `.watch` method).
- * @param {object} store - The Vuex store instance; defaults to the core store singleton.
- * @returns {Promise<object>} Resolves with the channel content sizes when the task completes.
- * @throws {Error} If the wizard is not in an import mode when called.
  */
 export function downloadChannelMetadata(store = coreStore) {
   if (

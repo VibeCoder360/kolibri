@@ -3,7 +3,6 @@
   <div
     ref="sideNav"
     class="side-nav-wrapper"
-    role="presentation"
     tabindex="0"
     @keyup.esc="toggleNav"
   >
@@ -251,7 +250,7 @@
       @cancel="languageModalShown = false"
     />
     <TooltipTour
-      v-if="tourActive && isTourActive('SideNavigation') && hasRole"
+      v-if="tourActive && isTourActive('SideNavigation') && !isLearner"
       page="SideNavigation"
       @tourEnded="endTour('SideNavigation')"
     />
@@ -339,7 +338,6 @@
         isLearnerOnlyImport,
         username,
         full_name,
-        hasRole,
       } = useUser();
       const { status, lastSynced } = useUserSyncStatus();
       const { topBarHeight, navItems } = useNav();
@@ -366,7 +364,6 @@
         tourActive,
         isTourActive,
         endTour,
-        hasRole,
       };
     },
     props: {
@@ -392,7 +389,7 @@
         return this.showAppNavView ? '100vw' : `${this.topBarHeight * 4.5}px`;
       },
       showSoudNotice() {
-        return this.isLearnerOnlyImport && this.hasRole;
+        return this.isLearnerOnlyImport && (this.isSuperuser || this.isAdmin || this.isCoach);
       },
       footerMsg() {
         return this.$tr('poweredBy', { version: __version });
@@ -474,10 +471,10 @@
           return true;
         }
         if (navItem.role === UserKinds.COACH) {
-          return this.hasRole;
+          return this.isCoach || this.isAdmin || this.isSuperuser;
         }
         if (navItem.role === UserKinds.ADMIN) {
-          return this.isAdmin;
+          return this.isAdmin || this.isSuperuser;
         }
         if (navItem.role === UserKinds.CAN_MANAGE_CONTENT) {
           return this.canManageContent || this.isSuperuser;
@@ -489,7 +486,7 @@
           return !this.isUserLoggedIn;
         }
         if (navItem.role === UserKinds.LEARNER) {
-          return this.isUserLoggedIn;
+          return this.isLearner || this.isCoach || this.isAdmin || this.isSuperuser;
         }
       },
       toggleNav() {
@@ -525,8 +522,8 @@
       },
 
       /**
-       * Focuses on correct first element for FocusTrap.
        * @public
+       * Focuses on correct first element for FocusTrap.
        */
       focusFirstEl() {
         this.$nextTick(() => {

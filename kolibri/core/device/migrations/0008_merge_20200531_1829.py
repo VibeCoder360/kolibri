@@ -3,6 +3,7 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("device", "0007_deviceappkey"),
         ("device", "0007_devicesettings_name"),

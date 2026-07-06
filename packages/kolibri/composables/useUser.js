@@ -26,47 +26,6 @@ const baseSessionState = {
 // Module-level state
 const sessionState = ref({ ...baseSessionState });
 
-/**
- * Three-state user model: every session is exactly one of
- * anonymous (!isUserLoggedIn), plain learner (isLearner), or role-holder (hasRole).
- * @typedef {object} UseUserReturn
- * @property {import('vue').ComputedRef<boolean>} isUserLoggedIn - Not anonymous;
- * equal to isLearner || hasRole.
- * @property {import('vue').ComputedRef<boolean>} isLearner - Logged in with no elevated role
- * ("plain learner"). Mutually exclusive with hasRole.
- * @property {import('vue').ComputedRef<boolean>} hasRole - Holds any elevated role (coach,
- * assignable coach, admin, or superuser). False for anonymous and plain learners.
- * @property {import('vue').ComputedRef<boolean>} isCoach - True for COACH or ASSIGNABLE_COACH.
- * @property {import('vue').ComputedRef<boolean>} isFacilityCoach - True for COACH only.
- * @property {import('vue').ComputedRef<boolean>} isClassCoach - True for ASSIGNABLE_COACH only.
- * @property {import('vue').ComputedRef<boolean>} isAdmin - True for ADMIN or SUPERUSER
- * (includes superuser).
- * @property {import('vue').ComputedRef<boolean>} isFacilityAdmin - True for ADMIN only
- * (excludes superuser).
- * @property {import('vue').ComputedRef<boolean>} isSuperuser - True for SUPERUSER only.
- * @property {import('vue').ComputedRef<boolean>} canManageContent - Whether the user may manage
- * channel content on this device.
- * @property {import('vue').ComputedRef<boolean>} isAppContext - Whether Kolibri is running inside
- * the app wrapper rather than a plain browser.
- * @property {import('vue').ComputedRef<boolean>} isLearnerOnlyImport - Whether this user was
- * imported without the rest of their facility's data.
- * @property {import('vue').ComputedRef<string|undefined>} currentUserId - The logged-in user's ID,
- * or undefined when anonymous.
- * @property {import('vue').ComputedRef<string|undefined>} userFacilityId - The user's facility ID,
- * or undefined when anonymous.
- * @property {import('vue').ComputedRef<object>} userPermissions - The user's device permission
- * flags (e.g. can_manage_content).
- * @property {import('vue').ComputedRef<boolean>} userHasPermissions - Whether the user holds any
- * device permission.
- * @property {import('vue').ComputedRef<object>} session - The raw session state object.
- * @property {import('vue').ComputedRef<string>} full_name - The user's full name.
- * @property {import('vue').ComputedRef<string|undefined>} sessionId - The current session's ID, or
- * undefined when anonymous.
- * @property {import('vue').ComputedRef<Array<string>>} kind - The user's role kinds (e.g.
- * ANONYMOUS, LEARNER, COACH).
- * @property {import('vue').ComputedRef<string>} username - The handle the user signs in with.
- * @returns {UseUserReturn} The session state, derived role flags, and login/logout actions.
- */
 export default function useUser() {
   // Session state
   const session = computed(() => sessionState.value);
@@ -92,23 +51,28 @@ export default function useUser() {
   const isFacilityCoach = computed(() => kind.value.includes(UserKinds.COACH));
   const isLearner = computed(() => kind.value.includes(UserKinds.LEARNER));
   const isFacilityAdmin = computed(() => kind.value.includes(UserKinds.ADMIN));
-  const hasRole = computed(() => isCoach.value || isAdmin.value);
   const userPermissions = computed(() => ({ can_manage_content: canManageContent.value }));
   const userFacilityId = computed(() => sessionState.value.facility_id);
+  const userKind = computed(() => {
+    if (isSuperuser.value) return UserKinds.SUPERUSER;
+    if (isAdmin.value) return UserKinds.ADMIN;
+    if (isCoach.value) return UserKinds.COACH;
+    if (isLearner.value) return UserKinds.LEARNER;
+    return UserKinds.ANONYMOUS;
+  });
   const userHasPermissions = computed(() => Object.values(userPermissions.value).some(Boolean));
 
   // Login/Logout Functions
   /**
    * Creates an authenticated session for the given credentials.
-   * @param {object} sessionPayload - Credentials sent to the server.
+   *
+   * @param {Object} sessionPayload - Credentials sent to the server.
    * @param {boolean} [prevalidate=false] - When true, validates credentials server-side without
-   * creating a session. Returns { full_name } on success so the caller can confirm the user's
-   * identity before committing to a real login (e.g. the picture-password confirm flow).
-   * Skips the Lockr update-modal flag and all redirect logic.
+   *   creating a session. Returns { full_name } on success so the caller can confirm the user's
+   *   identity before committing to a real login (e.g. the picture-password confirm flow).
+   *   Skips the Lockr update-modal flag and all redirect logic.
    * @param {boolean} [enableRedirect=true] - When false, suppresses the post-login redirect,
-   * allowing the caller to handle navigation manually.
-   * @returns {Promise<object|undefined>} Resolves with `{ data, error }`, or undefined when an
-   * unexpected error is handled globally.
+   *   allowing the caller to handle navigation manually.
    */
   async function login(sessionPayload, prevalidate = false, enableRedirect = true) {
     if (!prevalidate) {
@@ -197,7 +161,7 @@ export default function useUser() {
     isFacilityAdmin,
     userPermissions,
     userFacilityId,
-    hasRole,
+    userKind,
     userHasPermissions,
 
     // State

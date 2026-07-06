@@ -31,9 +31,8 @@
         >
           <div
             class="tab"
-            tabindex="0"
+            :tabindex="tab.disabled ? -1 : 0"
             :aria-label="tab.label"
-            :aria-disabled="tab.disabled"
             role="button"
             @click="selectTab(tab.name)"
             @keydown.enter="selectTab(tab.name)"
@@ -135,10 +134,7 @@
     },
     methods: {
       selectTab(tabName) {
-        const tab = this.tabs.find(t => t.name === tabName);
-        if (tab && !tab.disabled) {
-          this.selectedTab = tabName;
-        }
+        this.selectedTab = tabName;
       },
     },
   };

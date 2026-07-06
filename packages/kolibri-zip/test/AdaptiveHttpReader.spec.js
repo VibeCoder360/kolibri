@@ -109,14 +109,14 @@ const TestScenarios = {
 /**
  * Factory to create a reader with mock server setup.
  * Reduces boilerplate for tests that need a fully initialized reader.
- * @param {object} scenario - Test scenario with size and url (or custom {size, url})
- * @param {object} options - Additional options
+ *
+ * @param {Object} scenario - Test scenario with size and url (or custom {size, url})
+ * @param {Object} options - Additional options
  * @param {number} options.maxFullLoadSize - Override maxFullLoadSize
  * @param {number} options.largeMediaThreshold - Override largeMediaThreshold
  * @param {number} options.chunkSize - Override chunkSize
- * @param {object} options.serverOptions - Options passed to createMockServer
- * @returns {Promise<{reader: AdaptiveHttpReader, data: Uint8Array, stats: object}>} -
- * Reader, generated test bytes, and mock-server request stats
+ * @param {Object} options.serverOptions - Options passed to createMockServer
+ * @returns {Promise<{reader: AdaptiveHttpReader, data: Uint8Array, stats: Object}>}
  */
 async function setupReader(scenario, options = {}) {
   const data = createTestData(scenario.size);
@@ -135,9 +135,6 @@ async function setupReader(scenario, options = {}) {
 
 /**
  * Create a reader without initializing (for testing constructor/pre-init behavior).
- * @param {string} url - URL for the ZIP resource
- * @param {object} [options] - Reader overrides
- * @returns {AdaptiveHttpReader} - Uninitialised reader
  */
 function createReader(url, options = {}) {
   return new AdaptiveHttpReader(url, {
@@ -152,14 +149,15 @@ function createReader(url, options = {}) {
 // =============================================================================
 
 /**
- * Build a ZIP central-directory entry descriptor for feeding into `_buildChunks()`.
- * @param {string} filename - Path recorded on the entry
+ * Create a single ZIP entry object for testing.
+ *
+ * @param {string} filename - Entry filename
  * @param {number} offset - Byte offset in ZIP file
  * @param {number} size - Compressed size (uncompressed defaults to same)
- * @param {object} [options] - Additional overrides (uncompressedSize, directory)
+ * @param {Object} options - Additional options
  * @param {number} options.uncompressedSize - Override uncompressed size
  * @param {boolean} options.directory - Mark as directory entry
- * @returns {object} Entry object compatible with _buildChunks()
+ * @returns {Object} Entry object compatible with _buildChunks()
  */
 function createEntry(filename, offset, size, options = {}) {
   return {
@@ -174,8 +172,10 @@ function createEntry(filename, offset, size, options = {}) {
 /**
  * Create multiple entries from compact specifications.
  * Each spec is [filename, offset, size] or [filename, offset, size, options].
+ *
  * @param {...Array} specs - Entry specifications
  * @returns {Array} Array of entry objects
+ *
  * @example
  * createEntries(
  *   ['a.txt', 0, 100],
@@ -194,13 +194,11 @@ function createEntries(...specs) {
 // =============================================================================
 
 /**
- * Shared Jest assertion helpers used across AdaptiveHttpReader suites.
+ * Common assertion patterns for reader state and request tracking.
  */
 const expectations = {
   /**
    * Assert reader is in lazy mode (large file was detected).
-   * @param {AdaptiveHttpReader} reader - Reader under test
-   * @param {number} [expectedSize] - Optional expected total size
    */
   lazyMode: (reader, expectedSize) => {
     expect(reader.useLazyMode).toBe(true);
@@ -212,8 +210,6 @@ const expectations = {
 
   /**
    * Assert reader is in fast mode (small file, fully cached).
-   * @param {AdaptiveHttpReader} reader - Reader under test
-   * @param {number} [expectedSize] - Optional expected byte length of cached data
    */
   fastMode: (reader, expectedSize) => {
     expect(reader.useLazyMode).toBe(false);
@@ -225,7 +221,6 @@ const expectations = {
 
   /**
    * Assert only a single full (non-range) request was made.
-   * @param {object} stats - Mock server stats
    */
   singleFullRequest: stats => {
     expect(stats.requestCount).toBe(1);
@@ -235,7 +230,6 @@ const expectations = {
 
   /**
    * Assert no range requests were made.
-   * @param {object} stats - Mock server stats
    */
   noRangeRequests: stats => {
     const rangeRequests = stats.requests.filter(r => r.type === 'range');
@@ -244,7 +238,6 @@ const expectations = {
 
   /**
    * Assert at least one range request was made.
-   * @param {object} stats - Mock server stats
    */
   hasRangeRequests: stats => {
     const rangeRequests = stats.requests.filter(r => r.type === 'range');
@@ -253,8 +246,6 @@ const expectations = {
 
   /**
    * Assert exact number of range requests.
-   * @param {object} stats - Mock server stats
-   * @param {number} count - Expected range request count
    */
   rangeRequestCount: (stats, count) => {
     const rangeRequests = stats.requests.filter(r => r.type === 'range');
@@ -263,8 +254,6 @@ const expectations = {
 
   /**
    * Assert request count hasn't changed from baseline.
-   * @param {object} stats - Mock server stats
-   * @param {number} baseline - Previous requestCount to compare against
    */
   noAdditionalRequests: (stats, baseline) => {
     expect(stats.requestCount).toBe(baseline);
@@ -272,8 +261,6 @@ const expectations = {
 
   /**
    * Verify data correctness using createTestData's i % 256 pattern.
-   * @param {Uint8Array} chunk - Chunk to inspect
-   * @param {number} startOffset - Offset at which the chunk begins
    */
   dataMatches: (chunk, startOffset) => {
     expect(chunk[0]).toBe(startOffset % 256);

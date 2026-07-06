@@ -8,6 +8,7 @@ from morango.sync.context import LocalSessionContext
 from kolibri.core.auth.constants.morango_sync import ScopeDefinitions
 from kolibri.core.auth.hooks import FacilityDataSyncHook
 
+
 logger = logging.getLogger(__name__)
 
 

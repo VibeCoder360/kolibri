@@ -90,42 +90,8 @@
                 />
               </div>
             </template>
-            <template v-else-if="colIndex === 1">
-              <KLabeledIcon nowrap>
-                <template #icon>
-                  <CoachStatusIcon :icon="iconForPhase(content.unit_phase)" />
-                </template>
-                <template v-if="content.unit_phase === UnitPhase.PRE_TEST_ACTIVE">
-                  {{ preTestRunningLabel$({ num: content.active_unit_number }) }}
-                </template>
-                <template v-else-if="content.unit_phase === UnitPhase.POST_TEST_ACTIVE">
-                  {{ postTestRunningLabel$({ num: content.active_unit_number }) }}
-                </template>
-                <template v-else-if="content.unit_phase === UnitPhase.POST_TEST_PENDING">
-                  {{ unitInProgressLabel$({ num: content.active_unit_number }) }}
-                </template>
-                <template v-else-if="content.unit_phase === UnitPhase.COMPLETE">
-                  {{ coreString('completedLabel') }}
-                </template>
-                <template v-else>
-                  {{ coreString('notStartedLabel') }}
-                </template>
-              </KLabeledIcon>
-            </template>
-            <template v-else-if="colIndex === 2">
-              <Recipients
-                :groupNames="getRecipientNamesForCourseSession(content)"
-                :hasAssignments="courseHasRecipients(content)"
-              />
-            </template>
-            <template v-else-if="colIndex === 3">
-              <StatusSummary
-                v-if="content.test_learner_progress"
-                :tally="content.test_learner_progress"
-                :verbose="true"
-                :showNeedsHelp="false"
-              />
-              <KEmptyPlaceholder v-else />
+            <template v-else-if="colIndex >= 1 && colIndex <= 3">
+              {{ content }}
             </template>
             <div
               v-else-if="colIndex === 4"
@@ -239,15 +205,9 @@
   import { useCourses } from '../../composables/useCourses';
   import { coachStrings } from '../common/commonCoachStrings';
   import emptyPlusCloudSvg from '../../images/empty_plus_cloud.svg';
-  import useClassSummary from '../../composables/useClassSummary';
-  import Recipients from '../common/Recipients.vue';
-  import StatusSummary from '../common/status/StatusSummary.vue';
-  import CoachStatusIcon from '../common/status/CoachStatusIcon.vue';
-  import { UnitPhase } from '../../constants/courseConstants';
-  import { ICONS } from '../common/status/constants';
-  import useAssignCourse from './composables/useAssignCourse';
-  import DeleteCourseConfirmationModal from './modals/DeleteCourseConfirmation.vue';
   import AssignCourseSuccessModal from './modals/AssignCourseSuccess.vue';
+  import DeleteCourseConfirmationModal from './modals/DeleteCourseConfirmation.vue';
+  import useAssignCourse from './composables/useAssignCourse';
 
   export default {
     name: 'CoursesRootPage',
@@ -258,9 +218,6 @@
       DeleteCourseConfirmationModal,
       FilterTextbox,
       MissingResourceAlert,
-      Recipients,
-      StatusSummary,
-      CoachStatusIcon,
     },
     setup() {
       const route = useRoute();
@@ -274,6 +231,7 @@
         assignCourseAction$,
         noCoursesAssigned$,
         emptyCoursesDescription$,
+        masteryLabel$,
         courseVisibleToLearnersMessage$,
         courseNotVisibleToLearnersMessage$,
         courseUpdateError$,
@@ -286,13 +244,8 @@
         courseDetailsAction$,
         editRecipientsAction$,
         allCoursesForClass$,
-        learnerProgressLabel$,
-        unitInProgressLabel$,
-        preTestRunningLabel$,
-        postTestRunningLabel$,
       } = coursesStrings;
       const { entireClassLabel$ } = coachStrings;
-      const { getRecipientNamesForCourseSession } = useClassSummary();
       const { show } = useKShow();
       const { windowIsSmall } = useKResponsiveWindow();
       const {
@@ -306,9 +259,7 @@
       const updatingCourseIds = ref(new Set());
 
       const addUpdatingCourseId = courseId => {
-        const updated = new Set(updatingCourseIds.value);
-        updated.add(courseId);
-        updatingCourseIds.value = updated;
+        updatingCourseIds.value = new Set([...updatingCourseIds.value, courseId]);
       };
 
       const removeUpdatingCourseId = courseId => {
@@ -485,19 +436,6 @@
         },
       );
 
-      function courseHasRecipients(course) {
-        return (
-          (course.assignments && course.assignments.length > 0) ||
-          (course.learner_ids && course.learner_ids.length > 0)
-        );
-      }
-
-      function iconForPhase(phase) {
-        if (phase === UnitPhase.COMPLETE) return ICONS.star;
-        if (phase === UnitPhase.PRE_TEST_PENDING || !phase) return ICONS.nothing;
-        return ICONS.clock;
-      }
-
       return {
         pageLoading,
         CoursesModals,
@@ -510,6 +448,7 @@
         assignCourseAction$,
         noCoursesAssigned$,
         emptyCoursesDescription$,
+        masteryLabel$,
         filterCourseStatus$,
         filterCourseVisible$,
         filterCourseNotVisible$,
@@ -531,14 +470,6 @@
         allCoursesForClass$,
         coreString,
         coachString,
-        UnitPhase,
-        iconForPhase,
-        learnerProgressLabel$,
-        unitInProgressLabel$,
-        preTestRunningLabel$,
-        postTestRunningLabel$,
-        getRecipientNamesForCourseSession,
-        courseHasRecipients,
       };
     },
     data() {
@@ -570,16 +501,16 @@
             columnId: 'status',
           },
           {
-            label: this.coachString('recipientsLabel'),
+            label: this.coachString('learnersLabel'),
             dataType: 'undefined',
             minWidth: '100px',
-            columnId: 'recipients',
+            columnId: 'learners',
           },
           {
-            label: this.learnerProgressLabel$(),
+            label: this.masteryLabel$(),
             dataType: 'undefined',
             minWidth: '100px',
-            columnId: 'learnerProgress',
+            columnId: 'mastery',
           },
           {
             label: this.coachString('lessonVisibleLabel'),
@@ -598,9 +529,9 @@
       tableRows() {
         return this.sortedCourses.map(course => [
           course, // title
-          course, // status
-          course, // recipients
-          course, // learner progress
+          '—', // status
+          '—', // learners
+          '—', // mastery
           course, // visible toggle
           course, // options menu
         ]);
@@ -787,6 +718,20 @@
     gap: 8px;
     align-items: center;
   }
+
+  .course-description {
+    margin-top: 4px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .course-title-text {
+    font-weight: 600;
+  }
+
+  // .hidden {
+  //   display: none;
+  // }
 
   .empty-courses {
     display: flex;

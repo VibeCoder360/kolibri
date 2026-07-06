@@ -97,7 +97,7 @@ export default function useLearnerResources() {
 
   /**
    * @returns {Array} - An array of { contentNodeId, lessonId, classId, active } objects
-   * of all resources from all learner's classes
+   *                    of all resources from all learner's classes
    * @private
    */
   const _classesResources = computed(() => {
@@ -127,7 +127,7 @@ export default function useLearnerResources() {
 
   /**
    * @returns {Array} - Active and in progress quizzes assigned to a learner
-   * in all their classes
+   *                    in all their classes
    * @public
    */
   const resumableClassesQuizzes = computed(() => {
@@ -136,7 +136,7 @@ export default function useLearnerResources() {
 
   /**
    * @returns {Array} - An array of { contentNodeId, lessonId, classId, contentNode } objects
-   * of all resources in progress from all learner's active lessons
+   *                    of all resources in progress from all learner's active lessons
    * @public
    */
   const resumableClassesResources = computed(() => {
@@ -152,8 +152,8 @@ export default function useLearnerResources() {
   });
 
   /**
-   * @returns {boolean} - `true` if a learner finished all active
-   * classes lessons and quizzes (or when there are none)
+   * @returns {Boolean} - `true` if a learner finished all active
+   *                       classes lessons and quizzes (or when there are none)
    * @public
    */
   const learnerFinishedAllClasses = computed(() => {
@@ -167,9 +167,8 @@ export default function useLearnerResources() {
   });
 
   /**
-   * Look up a cached learner classroom by id.
-   * @param {string} classId - Classroom id to find
-   * @returns {object} A class
+   * @param {String} classId
+   * @returns {Object} A class
    * @public
    */
   function getClass(classId) {
@@ -177,8 +176,7 @@ export default function useLearnerResources() {
   }
 
   /**
-   * Return the active lessons on the classroom with the given id.
-   * @param {string} classId - Classroom id
+   * @param {String} classId
    * @returns {Array} All active lessons of a class
    * @public
    */
@@ -191,8 +189,7 @@ export default function useLearnerResources() {
   }
 
   /**
-   * Return the active quizzes on the classroom with the given id.
-   * @param {string} classId - Classroom id
+   * @param {String} classId
    * @returns {Array} All active quizzes of a class
    * @public
    */
@@ -205,8 +202,7 @@ export default function useLearnerResources() {
   }
 
   /**
-   * Return the courses assigned to the classroom with the given id.
-   * @param {string} classId - Classroom id
+   * @param {String} classId
    * @returns {Array} All courses of a class
    * @public
    */
@@ -219,9 +215,8 @@ export default function useLearnerResources() {
   }
 
   /**
-   * Build a router target for opening a classroom lesson playlist.
-   * @param {object} lesson - Lesson record from the classroom payload
-   * @returns {object} vue-router link to a lesson page
+   * @param {Object} lesson
+   * @returns {Object} vue-router link to a lesson page
    * @public
    */
   function getClassLessonLink(lesson) {
@@ -238,11 +233,9 @@ export default function useLearnerResources() {
   }
 
   /**
-   * Build a router target for a classroom quiz, routing to the report view
-   * when the quiz is closed and to the viewer otherwise.
-   * @param {object} quiz - Exam record from the classroom payload
-   * @returns {object} vue-router link to a quiz report page when the quiz
-   * is closed. Otherwise returns a link to a quiz page.
+   * @param {Object} quiz
+   * @returns {Object} vue-router link to a quiz report page when the quiz
+   *                   is closed. Otherwise returns a link to a quiz page.
    * @public
    */
   function getClassQuizLink(quiz) {
@@ -272,9 +265,8 @@ export default function useLearnerResources() {
   }
 
   /**
-   * Build a router target for a classroom course page.
-   * @param {object} course - Course record from the classroom payload
-   * @returns {object} vue-router link to a course page (placeholder)
+   * @param {Object} course
+   * @returns {Object} vue-router link to a course page (placeholder)
    * @public
    */
   function getClassCourseLink(course) {
@@ -292,10 +284,10 @@ export default function useLearnerResources() {
   /**
    * Fetches a class by its ID and saves data
    * to this composable's store
-   * @param {object} params - Request parameters
-   * @param {string} params.classId - Classroom id to load
-   * @param {boolean} [params.force] - Cache won't be used when `true`
-   * @returns {Promise} - Resolves with the loaded classroom
+   *
+   * @param {String} classId
+   * @param {Boolean} force Cache won't be used when `true`
+   * @returns  {Promise}
    * @public
    */
   function fetchClass({ classId, force = false }) {
@@ -310,9 +302,9 @@ export default function useLearnerResources() {
   /**
    * Fetches current learner's classes
    * and saves data to this composable's store
-   * @param {object} [params] - Request parameters
-   * @param {boolean} [params.force] - Cache won't be used when `true`
-   * @returns {Promise} - Resolves once the classes store has been populated
+   *
+   * @param {Boolean} force Cache won't be used when `true`
+   * @returns {Promise}
    * @public
    */
   function fetchClasses({ force = false } = {}) {
@@ -331,7 +323,8 @@ export default function useLearnerResources() {
   /**
    * Fetches resumable content nodes with their progress data
    * and saves data to this composable's store
-   * @returns {Promise} - Resolves with the resumable nodes array
+   *
+   * @returns {Promise}
    * @public
    */
   function fetchResumableContentNodes() {
@@ -354,7 +347,8 @@ export default function useLearnerResources() {
   /**
    * Fetches more resumable content nodes with their progress data
    * and saves data to this composable's store
-   * @returns {Promise} - Resolves with the next page of resumable nodes
+   *
+   * @returns {Promise}
    * @public
    */
   function fetchMoreResumableContentNodes() {
@@ -379,9 +373,8 @@ export default function useLearnerResources() {
   });
 
   /**
-   * Return the cached content tree for the given course.
-   * @param {string} courseId - Course identifier
-   * @returns {object} Course content tree
+   * @param {String} courseId
+   * @returns {Object} Course content tree
    * @public
    */
   function getCourseContent(courseId) {
@@ -389,9 +382,8 @@ export default function useLearnerResources() {
   }
 
   /**
-   * Return the cached progress data for the given course.
-   * @param {string} courseId - Course identifier
-   * @returns {object} Course progress data
+   * @param {String} courseId
+   * @returns {Object} Course progress data
    * @public
    */
   function getCourseProgress(courseId) {
@@ -399,9 +391,8 @@ export default function useLearnerResources() {
   }
 
   /**
-   * Return the top-level unit nodes of the given course.
-   * @param {string} courseId - Course identifier whose units to read
-   * @returns {Array} Ordered unit nodes from the cached course tree
+   * @param {String} courseId
+   * @returns {Array} Course units
    * @public
    */
   function getCourseUnits(courseId) {
@@ -411,10 +402,10 @@ export default function useLearnerResources() {
   /**
    * Fetches a course by its session ID and saves data
    * to this composable's store
-   * @param {object} params - Request parameters
-   * @param {string} params.courseSessionId - Learner course session id
-   * @param {boolean} [params.force] - Cache won't be used when `true`
-   * @returns {Promise<object>} Course data
+   *
+   * @param {String} courseSessionId
+   * @param {Boolean} force Cache won't be used when `true`
+   * @returns {Promise<Object>} Course data
    * @public
    */
   async function fetchCourse({ courseSessionId, force = false }) {
@@ -445,9 +436,9 @@ export default function useLearnerResources() {
   /**
    * Fetches current learner's courses
    * and saves data to this composable's store
-   * @param {object} [params] - Request parameters
-   * @param {boolean} [params.force] - Cache won't be used when `true`
-   * @returns {Promise<Array>} - Resolves with the loaded course collection
+   *
+   * @param {Boolean} force Cache won't be used when `true`
+   * @returns {Promise<Array>}
    * @public
    */
   async function fetchCourses({ force = false } = {}) {
@@ -457,11 +448,8 @@ export default function useLearnerResources() {
   }
 
   /**
-   * Report whether the pre- or post-test for a unit is currently offered.
-   * @param {string} courseId - Course identifier
-   * @param {string} unitId - Unit identifier
-   * @param {string} testType - 'pre' or 'post'
-   * @returns {boolean} Whether the test is currently available
+   * @param {String} testType - 'pre' or 'post'
+   * @returns {Boolean} Whether the test is currently available
    * @public
    */
   function isUnitTestAvailable(courseId, unitId, testType) {

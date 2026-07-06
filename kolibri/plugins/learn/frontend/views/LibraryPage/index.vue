@@ -186,7 +186,7 @@
         />
       </SidePanelModal>
       <TooltipTour
-        v-if="tourActive && isTourActive('LibraryPage') && hasRole"
+        v-if="tourActive && isTourActive('LibraryPage') && !isLearner"
         page="LibraryPage"
         @tourEnded="endTour('LibraryPage')"
       />
@@ -272,7 +272,7 @@
       const store = currentInstance.$store;
       const router = currentInstance.$router;
       const { tourActive, isTourActive, startTour, endTour, resumeTour } = useTour();
-      const { isUserLoggedIn, hasRole, currentUserId } = useUser();
+      const { isUserLoggedIn, isCoach, isAdmin, isSuperuser, isLearner, currentUserId } = useUser();
       const picturePasswordPending = useSessionStorage(
         PICTURE_PASSWORD_ASSIGNED_MODAL_PENDING,
         false,
@@ -320,7 +320,7 @@
         return ContentNodeResource.fetchCollection({
           getParams: {
             parent__isnull: true,
-            include_coach_content: get(hasRole),
+            include_coach_content: get(isAdmin) || get(isCoach) || get(isSuperuser),
             baseurl,
           },
         }).then(
@@ -438,7 +438,7 @@
         rootNodes,
         pageLoading,
         isUserLoggedIn,
-        hasRole,
+        isLearner,
         tourActive,
         isTourActive,
         startTour,

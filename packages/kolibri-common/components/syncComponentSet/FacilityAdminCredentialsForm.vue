@@ -1,6 +1,6 @@
 <template>
 
-  <form @submit.prevent="submitForm">
+  <form @keydown.enter="submitForm">
     <p
       v-if="singleFacility && facility.name"
       class="facility-name"
@@ -23,10 +23,10 @@
 
     <UsernameTextbox
       ref="username"
-      :autofocus="true"
       :value.sync="username"
       :isValid.sync="usernameValid"
       :shouldValidate="shouldValidate"
+      :autofocus="true"
       :disabled="$attrs.disabled"
     />
     <PasswordTextbox
@@ -37,13 +37,6 @@
       :showConfirmationInput="false"
       :disabled="$attrs.disabled"
     />
-    <button
-      type="submit"
-      tabindex="-1"
-      class="visuallyhidden"
-    >
-      {{ coreString('continueAction') }}
-    </button>
   </form>
 
 </template>
@@ -128,9 +121,8 @@
     },
     methods: {
       /**
-       * Validates the form and, if valid, initiates a peer facility import task.
-       * @returns {Promise} Resolves to the new task ID on success, or false on failure.
        * @public
+       * @return {Promise<Boolean>}
        */
       startImport() {
         this.shouldValidate = true;

@@ -554,6 +554,7 @@ class ImportChannelTestCase(TestCase):
         start_progress_mock,
         import_channel_mock,
     ):
+
         dummy_job = create_dummy_job()
         get_current_job_mock.return_value = dummy_job
         fd, local_path = tempfile.mkstemp()
@@ -3015,6 +3016,7 @@ class ExportContentTestCase(TestCase):
 
 
 class TestFilesToTransfer(TestCase):
+
     fixtures = ["content_test.json"]
     the_channel_id = "6199dde695db4ee4ab392222d5af1e5c"
 
@@ -3783,7 +3785,9 @@ class NewChannelImportRegressionTestCase(TestCase):
             manager, "do_channel_database_import", side_effect=mock_db_import
         ), patch.object(
             manager, "prepare_for_import", side_effect=mock_prepare
-        ), patch.object(manager, "run_import", return_value=(0, 0)), patch.object(
+        ), patch.object(
+            manager, "run_import", return_value=(0, 0)
+        ), patch.object(
             manager, "finalize_standalone_progress_tracking"
         ):
             manager.run()
@@ -3831,7 +3835,9 @@ class NewChannelImportRegressionTestCase(TestCase):
             manager, "prepare_for_import", side_effect=mock_prepare
         ), patch.object(
             manager, "run_import", side_effect=mock_run_import
-        ), patch.object(manager, "finalize_standalone_progress_tracking"):
+        ), patch.object(
+            manager, "finalize_standalone_progress_tracking"
+        ):
             manager.job = mock_job
             manager.run()
 

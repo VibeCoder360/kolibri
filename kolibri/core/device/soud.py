@@ -32,6 +32,7 @@ from kolibri.core.discovery.utils.network.errors import NetworkLocationNotFound
 from kolibri.core.utils.urls import reverse_path
 from kolibri.utils.conf import OPTIONS
 
+
 logger = logging.getLogger(__name__)
 WINDOW_SEC = 3
 MAX_ATTEMPTS = 5
@@ -135,7 +136,7 @@ def get_last_successful_sync(with_instance_id, as_server=True):
             active=False,
             transfer_stage=transfer_stages.CLEANUP,
             transfer_stage_status=transfer_statuses.COMPLETED,
-            **sync_session_filter,
+            **sync_session_filter
         )
         .order_by("-last_activity_timestamp")
         .first()
@@ -348,9 +349,7 @@ def execute_syncs():
     # since there should only ever be one processing job running at a time, if we encounter any in
     # the queue that are marked as syncing, we should reset their status to pending because it must
     # mean that the previous job was terminated unexpectedly
-    SyncQueue.objects.filter(
-        status=SyncQueueStatus.Syncing,
-    ).update(
+    SyncQueue.objects.filter(status=SyncQueueStatus.Syncing,).update(
         status=SyncQueueStatus.Pending,
         updated=time.time(),
         keep_alive=0,

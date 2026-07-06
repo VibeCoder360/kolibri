@@ -5,6 +5,7 @@ import kolibri.core.auth.models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("kolibriauth", "0028_facilityuser_date_deleted"),
     ]

@@ -5,6 +5,7 @@ import kolibri.core.fields
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("kolibriauth", "0027_alter_facilitydataset_extra_fields"),
     ]

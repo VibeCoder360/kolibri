@@ -38,9 +38,9 @@
   import useKResponsiveWindow from 'kolibri-design-system/lib/composables/useKResponsiveWindow';
 
   /**
-   * @typedef  {object}  Tab
-   * @property {string} label - User-facing label for the tab.
-   * @property {string} id - Unique identifier for the tab.
+   * @typedef   {Object}    Tab
+   * @property  {string}    label
+   * @property  {string}    id
    */
 
   export default {

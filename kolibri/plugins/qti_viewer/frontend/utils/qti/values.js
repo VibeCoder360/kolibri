@@ -41,11 +41,9 @@ function parseSpaceSeparated(str, coerceFn) {
 }
 
 /**
- * Coerces a value to a QTI point (array of two integers).
- * @param {string|Array<string|number>} value - The value to coerce; accepts an
- * `[x, y]` array or a space-separated string.
- * @returns {[number, number]} `[x, y]` array of integers.
- * @throws {TypeError} When `value` cannot be coerced to a point.
+ * Coerces a value to a QTI point (array of two integers)
+ * @param {*} value - The value to coerce
+ * @returns {Array} - [x, y] array of integers
  */
 export function coercePoint(value) {
   if (isArray(value) && value.length === 2) {
@@ -61,9 +59,9 @@ export function coercePoint(value) {
 }
 
 /**
- * Validates if a value can be coerced to a QTI point.
- * @param {string|Array<string|number>} value - The value to validate.
- * @returns {boolean} True if valid point.
+ * Validates if a value can be coerced to a QTI point
+ * @param {*} value - The value to validate
+ * @returns {boolean} - True if valid point
  */
 export function validatePoint(value) {
   try {
@@ -75,11 +73,9 @@ export function validatePoint(value) {
 }
 
 /**
- * Coerces a value to a QTI pair (array of two strings).
- * @param {string|Array<string|number>} value - The value to coerce; accepts a
- * `[first, second]` array or a space-separated string.
- * @returns {[string, string]} `[first, second]` array of strings.
- * @throws {TypeError} When `value` cannot be coerced to a pair.
+ * Coerces a value to a QTI pair (array of two strings)
+ * @param {*} value - The value to coerce
+ * @returns {Array} - [first, second] array of strings
  */
 export function coercePair(value) {
   if (isArray(value) && value.length === 2) {
@@ -95,9 +91,9 @@ export function coercePair(value) {
 }
 
 /**
- * Validates if a value can be coerced to a QTI pair.
- * @param {string|Array<string|number>} value - The value to validate.
- * @returns {boolean} True if valid pair.
+ * Validates if a value can be coerced to a QTI pair
+ * @param {*} value - The value to validate
+ * @returns {boolean} - True if valid pair
  */
 export function validatePair(value) {
   try {
@@ -109,10 +105,9 @@ export function validatePair(value) {
 }
 
 /**
- * Coerces a value to a QTI duration (non-negative number).
- * @param {string|number} value - The value to coerce.
- * @returns {number} The coerced duration value.
- * @throws {TypeError} When `value` cannot be coerced to a non-negative number.
+ * Coerces a value to a QTI duration (non-negative number)
+ * @param {*} value - The value to coerce
+ * @returns {number} - The coerced duration value
  */
 export function coerceDuration(value) {
   const num = parseFloat(value);
@@ -123,9 +118,9 @@ export function coerceDuration(value) {
 }
 
 /**
- * Validates if a value can be coerced to a QTI duration.
- * @param {string|number} value - The value to validate.
- * @returns {boolean} True if valid duration.
+ * Validates if a value can be coerced to a QTI duration
+ * @param {*} value - The value to validate
+ * @returns {boolean} - True if valid duration
  */
 export function validateDuration(value) {
   try {
@@ -137,20 +132,19 @@ export function validateDuration(value) {
 }
 
 /**
- * Validates if a value is a valid QTI file (JavaScript File object).
- * @param {unknown} value - The value to validate.
- * @returns {boolean} True if `value` is a `File` instance.
+ * Validates if a value is a valid QTI file (JavaScript File object)
+ * @param {*} value - The value to validate
+ * @returns {boolean} - True if valid File object
  */
 export function validateFile(value) {
   return value instanceof File;
 }
 
 /**
- * Coerces a value to the specified QTI base type.
- * @param {unknown} value - The value to coerce.
- * @param {string} baseType - The QTI base type.
- * @returns {unknown} The coerced value, or null when `value` is null/undefined/empty.
- * @throws {TypeError} When `value` cannot be coerced to the requested base type.
+ * Coerces a value to the specified QTI base type
+ * @param {*} value - The value to coerce
+ * @param {string} baseType - The QTI base type
+ * @returns {*} - The coerced value
  */
 export function coerceValueWithBaseType(value, baseType) {
   // Handle null/undefined/empty cases per QTI specification

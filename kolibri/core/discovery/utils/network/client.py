@@ -6,6 +6,10 @@ import requests
 from django.utils import timezone
 
 import kolibri
+from . import errors
+from .urls import get_normalized_url_variations
+from .urls import HTTP_PORTS
+from .urls import HTTPS_PORTS
 from kolibri.core.discovery.models import ConnectionStatus
 from kolibri.core.discovery.models import LocationTypes
 from kolibri.core.discovery.models import NetworkLocation
@@ -13,11 +17,6 @@ from kolibri.core.tasks.utils import get_current_job
 from kolibri.core.utils.urls import join_url
 from kolibri.utils.http_session import SameHostSession
 from kolibri.utils.server import get_urls
-
-from . import errors
-from .urls import get_normalized_url_variations
-from .urls import HTTP_PORTS
-from .urls import HTTPS_PORTS
 
 logger = logging.getLogger(__name__)
 
@@ -239,8 +238,8 @@ class NetworkClient(SameHostSession):
         :return: A boolean determining success, never False if `raise_if_unavailable=True`
         """
 
-        from kolibri.core.device.utils import device_info_keys
         from kolibri.core.device.utils import DEVICE_INFO_VERSION
+        from kolibri.core.device.utils import device_info_keys
 
         # don't reconnect if client has already done so
         if self.device_info is not None:

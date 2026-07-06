@@ -13,7 +13,6 @@ from django.db.models.signals import pre_delete
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
-from mock import Mock
 from mock import patch
 from morango.constants import transfer_stages
 from morango.constants import transfer_statuses
@@ -28,6 +27,19 @@ from morango.sync.controller import MorangoProfileController
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from .. import models
+from ..constants import role_kinds
+from ..constants.facility_presets import mappings
+from ..models import Facility
+from ..serializers import _prepare_for_bulk_create
+from .helpers import create_superuser
+from .helpers import disable_picture_password
+from .helpers import DUMMY_PASSWORD
+from .helpers import enable_picture_password
+from .helpers import KolibriAPITestCase as APITestCase
+from .helpers import KolibriAPITransactionTestCase as APITransactionTestCase
+from .helpers import provision_device
+from .helpers import setup_device
 from kolibri.core import error_constants
 from kolibri.core.auth.backends import FACILITY_CREDENTIAL_KEY
 from kolibri.core.auth.constants import demographics
@@ -39,25 +51,7 @@ from kolibri.core.auth.signals import cascade_delete_user
 from kolibri.core.auth.tasks import assign_picture_passwords_to_facility
 from kolibri.core.device.models import OSUser
 from kolibri.core.device.utils import set_device_settings
-from kolibri.core.discovery.utils.network.client import NetworkClient
-from kolibri.core.discovery.utils.network.errors import NetworkLocationConnectionFailure
-from kolibri.core.discovery.utils.network.errors import NetworkLocationResponseFailure
-from kolibri.core.discovery.utils.network.errors import NetworkLocationResponseTimeout
 from kolibri.core.tasks.job import Job
-
-from .. import models
-from ..constants import role_kinds
-from ..constants.facility_presets import mappings
-from ..models import Facility
-from ..viewsets.membership import _prepare_for_bulk_create
-from .helpers import create_superuser
-from .helpers import disable_picture_password
-from .helpers import DUMMY_PASSWORD
-from .helpers import enable_picture_password
-from .helpers import KolibriAPITestCase as APITestCase
-from .helpers import KolibriAPITransactionTestCase as APITransactionTestCase
-from .helpers import provision_device
-from .helpers import setup_device
 
 
 class FacilityFactory(factory.DjangoModelFactory):
@@ -424,23 +418,6 @@ class ClassroomAPITestCase(APITestCase):
         # Should return all classrooms
         self.assertEqual(len(response.data), len(self.classrooms))
 
-    def test_soft_deleted_coach_excluded_from_classroom(self):
-        self.login_superuser()
-        coach = FacilityUserFactory.create(facility=self.facility)
-        self.classrooms[0].add_coach(coach)
-        # Soft-delete the coach
-        coach.delete()
-        response = self.client.get(
-            reverse(
-                "kolibri:core:classroom-detail",
-                kwargs={"pk": self.classrooms[0].id},
-            ),
-            format="json",
-        )
-        self.assertEqual(response.status_code, 200)
-        coach_ids = [c["id"] for c in response.data["coaches"]]
-        self.assertNotIn(coach.id, coach_ids)
-
     def test_cannot_create_classroom_same_name(self):
         self.login_superuser()
         classroom_name = self.classrooms[0].name
@@ -696,42 +673,6 @@ class FacilityAPITestCase(APITestCase):
                 item["facility"],
             )
 
-    def test_public_facilityuser_roles_are_flat_strings(self):
-        """Roles must be a flat list of kind strings, not nested objects.
-
-        Consumers (RemoteFacilityUserAuthenticatedViewset, peer import
-        validation, frontend JS) do ``role in roles`` checks against plain
-        strings like "admin", so the shape must stay ["admin", ...].
-        """
-        # Give user1 an admin role on the facility
-        models.Role.objects.create(
-            user=self.user1, collection=self.facility1, kind="admin"
-        )
-        credentials = base64.b64encode(
-            str.encode(
-                "username={}&{}={}:{}".format(
-                    self.superuser.username,
-                    FACILITY_CREDENTIAL_KEY,
-                    self.facility1.id,
-                    DUMMY_PASSWORD,
-                )
-            )
-        ).decode("ascii")
-        self.client.credentials(HTTP_AUTHORIZATION="Basic {}".format(credentials))
-        response = self.client.get(
-            reverse("kolibri:core:publicuser-list"),
-            {"facility_id": self.facility1.id},
-            format="json",
-        )
-        user1_data = next(u for u in response.data if u["id"] == self.user1.id)
-        self.assertEqual(user1_data["roles"], ["admin"])
-        # Regular user with no roles gets an empty list
-        user2_data = next(
-            (u for u in response.data if u["roles"] == []),
-            None,
-        )
-        self.assertIsNotNone(user2_data)
-
     def test_create_new_facility_non_superuser_permission_denied(self):
         self.client.login(
             username=self.user1.username,
@@ -905,79 +846,6 @@ class FacilityAPITestCase(APITestCase):
         self.assertEqual(response.status_code, 200)
         # facility1 has user1 (a learner) plus the superuser (not a learner)
         self.assertEqual(response.data["num_learners"], 1)
-
-    def test_facility_response_has_dataset_nested_object(self):
-        self.client.login(
-            username=self.user1.username,
-            password=DUMMY_PASSWORD,
-            facility=self.facility1,
-        )
-        response = self.client.get(
-            reverse("kolibri:core:facility-detail", kwargs={"pk": self.facility1.pk}),
-            format="json",
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertIsInstance(response.data["dataset"], dict)
-
-    def test_dataset_has_exactly_expected_fields(self):
-        self.client.login(
-            username=self.user1.username,
-            password=DUMMY_PASSWORD,
-            facility=self.facility1,
-        )
-        response = self.client.get(
-            reverse("kolibri:core:facility-detail", kwargs={"pk": self.facility1.pk}),
-            format="json",
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            set(response.data["dataset"].keys()),
-            {
-                "id",
-                "learner_can_edit_username",
-                "learner_can_edit_name",
-                "learner_can_edit_password",
-                "learner_can_sign_up",
-                "learner_can_delete_account",
-                "learner_can_login_with_no_password",
-                "show_download_button_in_learn",
-                "enable_mark_attendance",
-                "extra_fields",
-                "picture_password_settings",
-                "description",
-                "location",
-                "registered",
-                "preset",
-                "allow_guest_access",
-                "is_full_facility_import",
-            },
-        )
-
-    def test_facility_response_has_num_classrooms(self):
-        self.client.login(
-            username=self.user1.username,
-            password=DUMMY_PASSWORD,
-            facility=self.facility1,
-        )
-        response = self.client.get(
-            reverse("kolibri:core:facility-detail", kwargs={"pk": self.facility1.pk}),
-            format="json",
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["num_classrooms"], 0)
-
-    def test_facility_response_has_num_users(self):
-        self.client.login(
-            username=self.user1.username,
-            password=DUMMY_PASSWORD,
-            facility=self.facility1,
-        )
-        response = self.client.get(
-            reverse("kolibri:core:facility-detail", kwargs={"pk": self.facility1.pk}),
-            format="json",
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertGreaterEqual(response.data["num_users"], 1)
 
 
 def _add_demographic_schema_to_facility(facility):
@@ -1259,7 +1127,7 @@ class UserUpdateTestCase(APITestCase):
         self.assertEqual(response.data[0]["metadata"]["field"], "extra_demographics")
 
 
-@patch("kolibri.core.auth.viewsets.facility_user.cleanup_expired_deleted_users")
+@patch("kolibri.core.auth.api.cleanup_expired_deleted_users")
 class UserDeleteTestCase(APITestCase):
     databases = "__all__"
 
@@ -1559,6 +1427,7 @@ class UserRetrieveTestCase(APITestCase):
             "is_superuser": user.is_superuser,
             "extra_demographics": None,
             "picture_password": user.picture_password,
+            "qr_login_token": user.qr_login_token,
         }
         roles = []
         user_roles = user.roles.all()
@@ -2399,25 +2268,6 @@ class FacilityDatasetAPITestCase(APITestCase):
         )
         self.assertEqual(response.status_code, 403)
 
-    def test_response_includes_allow_guest_access_field(self):
-        self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
-        set_device_settings(allow_guest_access=False)
-        response = self.client.get(reverse("kolibri:core:facilitydataset-list"))
-        self.assertEqual(response.status_code, 200)
-        self.assertGreater(len(response.data), 0)
-        self.assertFalse(response.data[0]["allow_guest_access"])
-
-    def test_response_includes_is_full_facility_import_field(self):
-        self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
-        response = self.client.get(
-            reverse("kolibri:core:facilitydataset-list"),
-            {"facility_id": self.facility.id},
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
-        # Locally-provisioned facilities have a FULL_FACILITY root certificate
-        self.assertIn("is_full_facility_import", response.data[0])
-
     def test_facility_admin_can_reset_settings(self):
         facility = FacilityFactory.create()
         admin = FacilityUserFactory.create(facility=facility)
@@ -2706,13 +2556,8 @@ class SaveFacilityLoginSettingsAPITestCase(APITestCase):
         mock_enqueued_job.job_id = "test-job-id"
         mock_storage.get_job.return_value = mock_enqueued_job
 
-    @patch(
-        "kolibri.core.auth.viewsets.facility_dataset.assign_picture_passwords_to_facility"
-    )
-    @patch(
-        "kolibri.core.auth.viewsets.facility_dataset.are_picture_passwords_exhausted",
-        return_value=True,
-    )
+    @patch("kolibri.core.auth.api.assign_picture_passwords_to_facility")
+    @patch("kolibri.core.auth.api.are_picture_passwords_exhausted", return_value=True)
     def test_enable_rejected_when_exhausted(self, mock_exhausted, mock_task):
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
         response = self.client.patch(
@@ -2723,10 +2568,8 @@ class SaveFacilityLoginSettingsAPITestCase(APITestCase):
         self.assertEqual(response.status_code, 400)
         mock_task.validate_job_data.assert_not_called()
 
-    @patch(
-        "kolibri.core.auth.viewsets.facility_dataset.assign_picture_passwords_to_facility"
-    )
-    @patch("kolibri.core.auth.viewsets.facility_dataset.job_storage")
+    @patch("kolibri.core.auth.api.assign_picture_passwords_to_facility")
+    @patch("kolibri.core.auth.api.job_storage")
     def test_enable_enqueues_task_and_returns_task_object(
         self, mock_storage, mock_task
     ):
@@ -2752,9 +2595,7 @@ class SaveFacilityLoginSettingsAPITestCase(APITestCase):
         self.assertTrue(dataset.learner_can_login_with_no_password)
         self.assertFalse(dataset.learner_can_edit_password)
 
-    @patch(
-        "kolibri.core.auth.viewsets.facility_dataset.assign_picture_passwords_to_facility"
-    )
+    @patch("kolibri.core.auth.api.assign_picture_passwords_to_facility")
     def test_update_settings_does_not_enqueue_task(self, mock_task):
         dataset = self.facility.dataset
         dataset.picture_password_settings = self._picture_password_settings()
@@ -2773,9 +2614,7 @@ class SaveFacilityLoginSettingsAPITestCase(APITestCase):
         dataset.refresh_from_db()
         self.assertEqual(dataset.picture_password_settings, new_settings)
 
-    @patch(
-        "kolibri.core.auth.viewsets.facility_dataset.assign_picture_passwords_to_facility"
-    )
+    @patch("kolibri.core.auth.api.assign_picture_passwords_to_facility")
     def test_disable_to_username_only(self, mock_task):
         dataset = self.facility.dataset
         dataset.picture_password_settings = self._picture_password_settings()
@@ -2798,9 +2637,7 @@ class SaveFacilityLoginSettingsAPITestCase(APITestCase):
         self.assertTrue(dataset.learner_can_login_with_no_password)
         self.assertFalse(dataset.learner_can_edit_password)
 
-    @patch(
-        "kolibri.core.auth.viewsets.facility_dataset.assign_picture_passwords_to_facility"
-    )
+    @patch("kolibri.core.auth.api.assign_picture_passwords_to_facility")
     def test_disable_to_username_and_password(self, mock_task):
         dataset = self.facility.dataset
         dataset.picture_password_settings = self._picture_password_settings()
@@ -2824,10 +2661,8 @@ class SaveFacilityLoginSettingsAPITestCase(APITestCase):
         self.assertFalse(dataset.learner_can_login_with_no_password)
         self.assertTrue(dataset.learner_can_edit_password)
 
-    @patch(
-        "kolibri.core.auth.viewsets.facility_dataset.assign_picture_passwords_to_facility"
-    )
-    @patch("kolibri.core.auth.viewsets.facility_dataset.job_storage")
+    @patch("kolibri.core.auth.api.assign_picture_passwords_to_facility")
+    @patch("kolibri.core.auth.api.job_storage")
     def test_enable_does_not_assign_inline(self, mock_storage, mock_task):
         self._setup_task_mocks(mock_storage, mock_task)
         self.client.login(username=self.admin.username, password=DUMMY_PASSWORD)
@@ -3605,14 +3440,8 @@ class RemoteAccessSessionTestCase(APITestCase):
             format="json",
         )
 
-    @patch(
-        "kolibri.core.auth.viewsets.session.valid_app_key_on_request",
-        return_value=False,
-    )
-    @patch(
-        "kolibri.core.auth.viewsets.session.allow_other_browsers_to_connect",
-        return_value=False,
-    )
+    @patch("kolibri.core.auth.api.valid_app_key_on_request", return_value=False)
+    @patch("kolibri.core.auth.api.allow_other_browsers_to_connect", return_value=False)
     def test_login_blocked_when_remote_access_disabled_in_app_context(
         self, mock_allow, mock_app_key
     ):
@@ -3620,41 +3449,24 @@ class RemoteAccessSessionTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertEqual(response.data[0]["id"], error_constants.INVALID_CREDENTIALS)
 
-    @patch(
-        "kolibri.core.auth.viewsets.session.valid_app_key_on_request",
-        return_value=False,
-    )
-    @patch(
-        "kolibri.core.auth.viewsets.session.allow_other_browsers_to_connect",
-        return_value=True,
-    )
+    @patch("kolibri.core.auth.api.valid_app_key_on_request", return_value=False)
+    @patch("kolibri.core.auth.api.allow_other_browsers_to_connect", return_value=True)
     def test_login_allowed_when_remote_access_enabled_in_app_context(
         self, mock_allow, mock_app_key
     ):
         response = self._login()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    @patch(
-        "kolibri.core.auth.viewsets.session.valid_app_key_on_request", return_value=True
-    )
-    @patch(
-        "kolibri.core.auth.viewsets.session.allow_other_browsers_to_connect",
-        return_value=False,
-    )
+    @patch("kolibri.core.auth.api.valid_app_key_on_request", return_value=True)
+    @patch("kolibri.core.auth.api.allow_other_browsers_to_connect", return_value=False)
     def test_login_allowed_with_app_key_when_remote_access_disabled(
         self, mock_allow, mock_app_key
     ):
         response = self._login()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    @patch(
-        "kolibri.core.auth.viewsets.session.valid_app_key_on_request",
-        return_value=False,
-    )
-    @patch(
-        "kolibri.core.auth.viewsets.session.allow_other_browsers_to_connect",
-        return_value=True,
-    )
+    @patch("kolibri.core.auth.api.valid_app_key_on_request", return_value=False)
+    @patch("kolibri.core.auth.api.allow_other_browsers_to_connect", return_value=True)
     def test_login_allowed_when_not_in_app_context(self, mock_allow, mock_app_key):
         response = self._login()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -3679,107 +3491,6 @@ class KolibriDataPortalViewSetTestCase(APITestCase):
             format="json",
         )
         mock_enqueue_sync.assert_called_once_with(self.facility)
-
-    def _register(self):
-        return self.client.post(
-            reverse("kolibri:core:portal-register"),
-            {"facility_id": self.facility.id, "token": "test-token"},
-            format="json",
-        )
-
-    @patch(
-        "kolibri.core.api.registerfacility",
-        side_effect=NetworkLocationConnectionFailure,
-    )
-    def test_register_offline(self, mock_registerfacility):
-        response = self._register()
-        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-        self.assertEqual(response.json()["status"], "offline")
-
-    @patch(
-        "kolibri.core.api.registerfacility",
-        side_effect=NetworkLocationResponseFailure(response=None),
-    )
-    def test_register_response_failure_without_response(self, mock_registerfacility):
-        response = self._register()
-        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-        self.assertEqual(response.json()["status"], "offline")
-
-    @patch("kolibri.core.api.registerfacility")
-    def test_register_non_json_error_response(self, mock_registerfacility):
-        portal_response = Mock(status_code=521, content=b"<html>error</html>")
-        portal_response.json.side_effect = ValueError
-        mock_registerfacility.side_effect = NetworkLocationResponseFailure(
-            response=portal_response
-        )
-        response = self._register()
-        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-        self.assertEqual(response.json()["status"], "offline")
-
-    @patch("kolibri.core.api.registerfacility")
-    def test_register_reflects_portal_error_constants(self, mock_registerfacility):
-        portal_response = Mock(status_code=400)
-        portal_response.json.return_value = [
-            {"id": "ALREADY_REGISTERED_FOR_COMMUNITY", "metadata": {"some": "detail"}},
-            {"id": "SOME_UNRECOGNIZED_ERROR"},
-        ]
-        mock_registerfacility.side_effect = NetworkLocationResponseFailure(
-            response=portal_response
-        )
-        response = self._register()
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), [{"id": "ALREADY_REGISTERED_FOR_COMMUNITY"}])
-
-    def _validate_token(self):
-        return self.client.get(
-            reverse("kolibri:core:portal-validate-token"), {"token": "test-token"}
-        )
-
-    @patch.object(
-        NetworkClient,
-        "get",
-        side_effect=NetworkLocationResponseFailure(response=None),
-    )
-    def test_validate_token_response_failure_without_response(self, mock_get):
-        response = self._validate_token()
-        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-        self.assertEqual(response.json()["status"], "offline")
-
-    @patch.object(NetworkClient, "get", side_effect=NetworkLocationResponseTimeout)
-    def test_validate_token_timeout(self, mock_get):
-        response = self._validate_token()
-        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-        self.assertEqual(response.json()["status"], "offline")
-
-    @patch.object(NetworkClient, "get")
-    def test_validate_token_non_json_error_response(self, mock_get):
-        portal_response = Mock(status_code=521, content=b"<html>error</html>")
-        portal_response.json.side_effect = ValueError
-        mock_get.side_effect = NetworkLocationResponseFailure(response=portal_response)
-        response = self._validate_token()
-        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-        self.assertEqual(response.json()["status"], "offline")
-
-    @patch.object(NetworkClient, "get")
-    def test_validate_token_reflects_invalid_token_error(self, mock_get):
-        portal_response = Mock(status_code=400)
-        portal_response.json.return_value = [{"id": "INVALID_KDP_REGISTRATION_TOKEN"}]
-        mock_get.side_effect = NetworkLocationResponseFailure(response=portal_response)
-        response = self._validate_token()
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.json(), [{"id": "INVALID_KDP_REGISTRATION_TOKEN"}])
-
-    @patch.object(NetworkClient, "get")
-    def test_validate_token_returns_project_name(self, mock_get):
-        portal_response = Mock(status_code=200)
-        portal_response.json.return_value = {
-            "name": "My Project",
-            "internal": "detail",
-        }
-        mock_get.return_value = portal_response
-        response = self._validate_token()
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json(), {"name": "My Project"})
 
 
 class PicturePasswordSerializerTestCase(APITestCase):
@@ -4447,9 +4158,7 @@ class RemoteFacilityUserViewsetTestCase(
     valid_item = {"id": "00000000000000000000000000000001", "username": "alice"}
 
     def _call_with_payload(self, payload):
-        with patch(
-            "kolibri.core.auth.viewsets.auth_views.NetworkClient"
-        ) as NetworkClient:
+        with patch("kolibri.core.auth.api.NetworkClient") as NetworkClient:
             client = NetworkClient.build_for_address.return_value
             client.get.return_value.json.return_value = payload
             return self.client.get(

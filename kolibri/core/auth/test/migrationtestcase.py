@@ -3,10 +3,12 @@ from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.recorder import MigrationRecorder
 from django.test import TransactionTestCase
 
+
 # Modified from https://www.caktusgroup.com/blog/2016/02/02/writing-unit-tests-django-migrations/
 
 
 class TestMigrations(TransactionTestCase):
+
     migrate_from = None
     migrate_to = None
     app = None
@@ -22,10 +24,10 @@ class TestMigrations(TransactionTestCase):
         cls.latest_migration = (cls.app, latest_migration.name)
 
     def setUp(self):
-        assert self.migrate_from and self.migrate_to, (
-            "TestCase '{}' must define migrate_from and migrate_to properties".format(
-                type(self).__name__
-            )
+        assert (
+            self.migrate_from and self.migrate_to
+        ), "TestCase '{}' must define migrate_from and migrate_to properties".format(
+            type(self).__name__
         )
 
         migrate_from = [(self.app, self.migrate_from)]

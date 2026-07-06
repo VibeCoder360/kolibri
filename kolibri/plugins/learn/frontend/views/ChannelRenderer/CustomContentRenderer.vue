@@ -8,7 +8,6 @@
       :style="{ backgroundColor: $themePalette.grey.v_200 }"
       frameBorder="0"
       :src="rooturl"
-      :title="$tr('contentFrameTitle')"
     >
     </iframe>
     <ContentModal
@@ -375,12 +374,6 @@
           .then(newMsg => {
             this.sandbox.mediator.sendMessage(newMsg);
           });
-      },
-    },
-    $trs: {
-      contentFrameTitle: {
-        message: 'Content viewer',
-        context: 'Accessible title for the iframe that displays the content',
       },
     },
   };

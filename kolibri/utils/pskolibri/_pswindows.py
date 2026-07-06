@@ -1,5 +1,4 @@
 """Windows platform implementation."""
-
 import ctypes
 import errno
 import functools

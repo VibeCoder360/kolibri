@@ -56,9 +56,8 @@ const VERB_MAP = {
  */
 
 /**
- * Pads a time interval value with leading zeros to at least 2 digits.
- * @param {number|string} interval - The time value to pad.
- * @returns {string} The zero-padded string.
+ * @param {String|Number} interval
+ * @return {string}
  */
 function padTime(interval) {
   return pad(interval, 2, '0');

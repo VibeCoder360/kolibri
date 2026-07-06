@@ -1,12 +1,10 @@
 import { Fraction } from 'fractional';
 
 export default (widget, rubric) => {
-  const userInput = {
-    rel: rubric.isInequality ? rubric.rel || 'ge' : 'eq',
-    isInequality: rubric.isInequality || false,
-    numLinePosition: rubric.correctX || rubric.range[0],
-    numDivisions: rubric.numDivisions || 10,
-  };
+  const newProps = {};
+  if (rubric.rel) {
+    newProps.rel = rubric.rel;
+  }
 
   if (rubric.correctX) {
     const correctX = rubric.correctX;
@@ -14,13 +12,14 @@ export default (widget, rubric) => {
     const rangeMax = rubric.range[1];
 
     const numDivisions = new Fraction(correctX - rangeMin, rangeMax - rangeMin).denominator;
-    userInput.numLinePosition = correctX;
-    userInput.numDivisions = Math.min(numDivisions, widget.props.divisionRange[1]);
+
+    newProps.numLinePosition = correctX;
+    newProps.numDivisions = Math.min(numDivisions, widget.props.divisionRange[1]);
   }
 
-  if (rubric.rel) {
-    userInput.rel = rubric.rel;
-  }
-
-  widget.props.handleUserInput(userInput);
+  widget.props.onChange(
+    newProps,
+    widget._renderGraphie, // cb
+    false, // silent
+  );
 };

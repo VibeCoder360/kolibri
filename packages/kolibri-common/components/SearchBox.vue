@@ -2,37 +2,33 @@
 
   <form
     class="search-box"
-    role="search"
     @submit.prevent="updateSearchQuery"
+    @keydown.esc.prevent="handleEscKey"
   >
     <div
       class="search-box-row"
-      role="presentation"
       :style="{
         backgroundColor: $themeTokens.surface,
         borderColor: $themePalette.grey.v_400,
         maxWidth: maxWidth,
         fontSize: '16px',
       }"
-      @keydown.esc.prevent="handleEscKey"
     >
       <label
-        :for="id"
-        class="search-label"
+        class="visuallyhidden"
+        for="searchfield"
+      >{{ coreString('searchLabel') }}</label>
+      <input
+        :id="id"
+        ref="searchInput"
+        v-model.trim="newSearchTerm"
+        type="search"
+        :disabled="disabled"
+        class="search-input"
+        :class="$computedClass(searchInputStyle)"
+        dir="auto"
+        :placeholder="computedPlaceholder"
       >
-        <span class="visuallyhidden">{{ coreString('searchLabel') }}</span>
-        <input
-          :id="id"
-          ref="searchInput"
-          v-model.trim="newSearchTerm"
-          type="search"
-          :disabled="disabled"
-          class="search-input"
-          :class="$computedClass(searchInputStyle)"
-          dir="auto"
-          :placeholder="computedPlaceholder"
-        >
-      </label>
       <div class="search-buttons-wrapper">
         <KIconButton
           icon="clear"
@@ -126,6 +122,7 @@
         return this.value !== null ? this.value : this.$route.query.keywords;
       },
       searchBarDisabled() {
+        // Disable the search bar if it has been cleared or has not been changed
         return this.searchInputValue === '' || this.disabled;
       },
       searchInputStyle() {
@@ -155,7 +152,6 @@
     },
     methods: {
       /**
-       * Moves keyboard focus to the search input element.
        * @public
        */
       focusSearchBox() {
@@ -201,20 +197,14 @@
   }
 
   .search-box-row {
-    display: flex;
-    align-items: center;
+    display: table;
     width: 100%;
     border: solid 1px;
     border-radius: $radius;
   }
 
-  .search-label {
-    flex: 1;
-    min-width: 0;
-  }
-
   .search-input {
-    display: block;
+    display: table-cell;
     width: 100%;
     height: 36px;
     padding: 0;
@@ -223,6 +213,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    vertical-align: middle;
     border: 0;
 
     // removes the IE clear button
@@ -237,12 +228,11 @@
   }
 
   .search-buttons-wrapper {
-    display: flex;
-    flex-shrink: 0;
-    align-items: center;
-    justify-content: flex-end;
+    display: table-cell;
     width: 80px;
     height: 36px;
+    text-align: right;
+    vertical-align: middle;
   }
 
   .search-clear-button {

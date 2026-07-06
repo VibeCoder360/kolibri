@@ -21,6 +21,7 @@ from requests.exceptions import Timeout
 
 from kolibri.utils.http_session import SameHostSession
 
+
 try:
     # Pre-empt the PanicException that importing cryptography can cause
     # when we are using a non-compatible version of cffi on Python 3.13
@@ -772,6 +773,7 @@ class FileDownload(Transfer):
         retry_wait=30,
         full_ranges=True,
     ):
+
         # Allow an existing requests.Session to be passed in, so it can be
         # reused for speed. The default blocks cross-host redirects so a
         # caller-supplied baseurl can't pivot us onto another host.

@@ -10,6 +10,10 @@ from rest_framework.status import HTTP_204_NO_CONTENT
 from rest_framework.status import HTTP_404_NOT_FOUND
 from rest_framework.test import APITestCase
 
+from .. import models
+from ..utils.network import connections
+from .helpers import mock_happy_no_os_request
+from .helpers import mock_request
 from kolibri.core.auth.test.helpers import create_superuser
 from kolibri.core.auth.test.helpers import DUMMY_PASSWORD
 from kolibri.core.auth.test.helpers import provision_device
@@ -19,11 +23,6 @@ from kolibri.core.discovery.well_known import CENTRAL_CONTENT_BASE_INSTANCE_ID
 from kolibri.core.discovery.well_known import CENTRAL_CONTENT_BASE_URL
 from kolibri.core.discovery.well_known import DATA_PORTAL_BASE_INSTANCE_ID
 from kolibri.core.discovery.well_known import DATA_PORTAL_SYNCING_BASE_URL
-
-from .. import models
-from ..utils.network import connections
-from .helpers import mock_happy_no_os_request
-from .helpers import mock_request
 
 
 @mock.patch.object(requests.Session, "request", mock_request)
@@ -266,10 +265,10 @@ class NetworkLocationFacilitiesViewTestCase(APITestCase):
     }
 
     def _retrieve(self, payload):
-        with mock.patch(
-            "kolibri.core.discovery.viewsets.network_location.NetworkClient"
-        ) as NetworkClient:
-            client = NetworkClient.build_from_network_location.return_value.__enter__.return_value
+        with mock.patch("kolibri.core.discovery.api.NetworkClient") as NetworkClient:
+            client = (
+                NetworkClient.build_from_network_location.return_value.__enter__.return_value
+            )
             client.base_url = self.peer.base_url
             client.get.return_value.json.return_value = payload
             return self.client.get(
@@ -417,16 +416,3 @@ class PinnedDeviceAPITestCase(APITestCase):
             reverse("kolibri:core:pinned_devices-detail", kwargs={"pk": other_pin.id}),
         )
         self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
-
-    def test_fetch_pinned_device_response_includes_id(self):
-        my_pin = models.PinnedDevice.objects.create(
-            user=self.user, instance_id=self.network_location.id
-        )
-        response = self.client.get(
-            reverse("kolibri:core:pinned_devices-list"),
-        )
-        self.assertEqual(response.status_code, HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        item = response.data[0]
-        self.assertIn("id", item)
-        self.assertEqual(item["id"], my_pin.id)

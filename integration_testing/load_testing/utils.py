@@ -1,7 +1,6 @@
 """
 Utility functions for load testing.
 """
-
 import csv
 import io
 import json
@@ -11,6 +10,7 @@ from le_utils.constants import content_kinds
 from logger import info
 from logger import plain
 from logger import warning
+
 
 # Path to saved lesson resources
 LESSON_RESOURCES_PATH = os.path.join(os.path.dirname(__file__), "lesson_resources.json")

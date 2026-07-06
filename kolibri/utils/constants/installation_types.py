@@ -2,6 +2,7 @@
 This module contains constants representing the type of "installers" used to install Kolibri.
 """
 
+
 APK = "apk"
 DEB = "deb"
 FLATPAK = "flatpak"

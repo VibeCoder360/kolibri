@@ -10,7 +10,6 @@ It stores:
 
 Eventually, it may also store user feedback on the content and the software.
 """
-
 import logging
 from datetime import timedelta
 
@@ -25,6 +24,7 @@ from django.utils import timezone
 from morango.models import SyncableModelQuerySet
 from morango.models import UUIDField
 
+from .permissions import AnyoneCanWriteAnonymousLogs
 from kolibri.core.auth.constants import role_kinds
 from kolibri.core.auth.models import AbstractFacilityDataModel
 from kolibri.core.auth.models import Facility
@@ -36,7 +36,6 @@ from kolibri.core.fields import DateTimeTzField
 from kolibri.core.fields import JSONField
 from kolibri.utils.time_utils import local_now
 
-from .permissions import AnyoneCanWriteAnonymousLogs
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +58,7 @@ class BaseLogQuerySet(SyncableModelQuerySet):
 
 
 def log_permissions(user_field):
+
     return (
         AnyoneCanWriteAnonymousLogs(field_name=user_field + "_id")
         | IsOwn(field_name=user_field + "_id")
@@ -74,6 +74,7 @@ def log_permissions(user_field):
 
 
 class BaseLogModel(AbstractFacilityDataModel):
+
     permissions = log_permissions("user")
 
     class Meta:

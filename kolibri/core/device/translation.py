@@ -1,7 +1,6 @@
 """
 Modified from django.utils.translation.trans_real
 """
-
 import re
 
 from django.conf import settings

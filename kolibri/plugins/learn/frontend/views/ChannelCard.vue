@@ -51,7 +51,7 @@
       </KFixedGrid>
 
       <CoachContentLabel
-        v-if="hasRole"
+        v-if="isUserLoggedIn && !isLearner"
         class="coach-content-label"
         :value="numCoachContents"
         :isTopic="true"
@@ -93,11 +93,12 @@
     },
     setup() {
       const { windowGutter } = useKResponsiveWindow();
-      const { hasRole } = useUser();
+      const { isUserLoggedIn, isLearner } = useUser();
 
       return {
         windowGutter,
-        hasRole,
+        isUserLoggedIn,
+        isLearner,
       };
     },
     props: {

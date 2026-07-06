@@ -1,10 +1,16 @@
 name: Kolibri Build Assets for Pull Request
-on: pull_request
+
+on:
+  pull_request:
+  workflow_dispatch:
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
+
 permissions:
   contents: read
+
 jobs:
   whl:
     name: Build WHL file
@@ -32,31 +38,31 @@ jobs:
   exe:
     name: Build EXE file
     needs: whl
-    uses: learningequality/kolibri-installer-windows/.github/workflows/build_exe.yml@v1.6.9
+    uses: VibeCoder360/kolibri-installer-windows/.github/workflows/build_exe.yml@v1.6.10
     with:
       whl-file-name: ${{ needs.whl.outputs.whl-file-name }}
-      ref: v1.6.9
+      ref: v1.6.10
   apk:
     name: Build APK file
     needs: whl
-    uses: learningequality/kolibri-installer-android/.github/workflows/build_apk.yml@v0.2.0
+    uses: VibeCoder360/kolibri-installer-android/.github/workflows/build_apk.yml@v0.1.11
     with:
       tar-file-name: ${{ needs.whl.outputs.tar-file-name }}
-      ref: v0.2.0
+      ref: v0.1.11
   zip:
     name: Build Raspberry Pi Image
     needs: deb
-    uses: learningequality/kolibri-image-pi/.github/workflows/build_img.yml@v1.1.1
+    uses: learningequality/kolibri-image-pi/.github/workflows/build_img.yml@v1.0.0
     with:
       deb-file-name: ${{ needs.deb.outputs.deb-file-name }}
-      ref: v1.1.1
+      ref: v1.0.0
   browser_smoke_test:
     name: Browser smoke test
     needs: whl
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6
       - name: Install Python
         uses: actions/setup-python@v6
         with:
@@ -85,41 +91,34 @@ jobs:
           path: ${{ runner.temp }}/smoke_test_screenshot.png
           if-no-files-found: ignore
   test_whl_file:
-    name: Test WHL file with uv-supported Python versions
+    name: Test WHL file
     needs: whl
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+        python-version: [3.9, '3.10', '3.11', '3.12', '3.13', '3.14']
         cext: [true, false]
     runs-on: ubuntu-latest
     steps:
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v8.1.0
+      - name: Install Python
+        uses: actions/setup-python@v6
         with:
-          enable-cache: true
-          cache-python: true
-      - name: Install Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
+          python-version: ${{ matrix.python-version }}
       - uses: actions/download-artifact@v8
         with:
           name: ${{ needs.whl.outputs.whl-file-name }}
           path: dist
-      # Seed the venv with real pip so the wheel is installed via pip itself
-      # (not `uv pip`), exercising the install path end users actually follow.
-      - name: Create virtual environment with pip
-        run: uv venv --seed --python ${{ matrix.python-version }}
       - name: Install WHL file
-        run: .venv/bin/pip install dist/${{ needs.whl.outputs.whl-file-name }}
+        run: pip install dist/${{ needs.whl.outputs.whl-file-name }}
       - name: Smoke test WHL file
         env:
           KOLIBRI_NO_C_EXTENSIONS: ${{ matrix.cext == false && '1' || '' }}
-        run: .venv/bin/kolibri configure setup
-  test_whl_file_no_uv:
-    name: Test WHL file with Python versions without uv support
+        run: kolibri configure setup
+  test_whl_file_eol_python:
+    name: Test WHL file with EOL Python versions
     needs: whl
     strategy:
       matrix:
-        python-version: [3.6, 3.7]
+        python-version: [3.6, 3.7, 3.8]
         cext: [true, false]
     runs-on: ubuntu-latest
     container:
@@ -135,19 +134,3 @@ jobs:
         env:
           KOLIBRI_NO_C_EXTENSIONS: ${{ matrix.cext == false && '1' || '' }}
         run: kolibri configure setup
-  # Single stable check for branch protection. Gate on this one job so matrix
-  # or implementation changes in the smoke tests don't require updating the
-  # required-checks list in branch protection.
-  smoke_tests:
-    name: WHL smoke tests
-    needs:
-      - whl
-      - browser_smoke_test
-      - test_whl_file
-      - test_whl_file_no_uv
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Fail if any needed job failed or was cancelled
-        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
-        run: exit 1

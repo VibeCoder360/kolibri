@@ -3,13 +3,12 @@ from contextlib import closing
 from contextlib import contextmanager
 from ipaddress import ip_address
 
-from kolibri.core.discovery.models import ConnectionStatus
-from kolibri.core.discovery.models import LocationTypes
-from kolibri.core.discovery.models import NetworkLocation
-
 from . import errors
 from .client import NetworkClient
 from .urls import parse_address_into_components
+from kolibri.core.discovery.models import ConnectionStatus
+from kolibri.core.discovery.models import LocationTypes
+from kolibri.core.discovery.models import NetworkLocation
 
 
 def check_if_port_open(base_url, timeout=1):
@@ -43,8 +42,8 @@ def capture_network_state(network_location, client):
     :param client: The NetworkClient which successfully connected to the location
     :type client: NetworkClient
     """
-    from kolibri.core.device.utils import device_info_keys
     from kolibri.core.device.utils import DEVICE_INFO_VERSION
+    from kolibri.core.device.utils import device_info_keys
 
     # having validated the base URL, we can save that
     network_location.base_url = client.base_url

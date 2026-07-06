@@ -16,7 +16,6 @@
 
     <div
       class="epub-viewer-content"
-      role="presentation"
       :style="{ 'border-color': $themeTokens.fineLine }"
       :dir="contentDirection"
       @mousedown.stop="handleMouseDown"

@@ -19,7 +19,6 @@ Usage:
     python loadtest.py run --users 50 --duration 5m
 
 """
-
 import os
 import subprocess
 import threading
@@ -33,6 +32,7 @@ from logger import plain
 from logger import section
 from logger import step
 from logger import success
+
 
 # Constants
 HAR_FILES_DIR = os.path.join(os.path.dirname(__file__), "har_files")

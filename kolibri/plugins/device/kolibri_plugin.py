@@ -25,6 +25,7 @@ class DeviceManagementAsset(WebpackBundleHook):
 
     @property
     def plugin_data(self):
+
         return {
             "isRemoteContent": OPTIONS["Deployment"]["REMOTE_CONTENT"],
             "canRestart": bool(OPTIONS["Deployment"]["RESTART_HOOKS"]),

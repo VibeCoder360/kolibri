@@ -4,7 +4,6 @@ options.ini file.
 The settings can be changed through environment variables or sections and keys
 in the options.ini file.
 """
-
 import ast
 import logging
 import os
@@ -18,6 +17,7 @@ from configobj import flatten_errors
 from configobj import get_extra_values
 from django.utils.functional import SimpleLazyObject
 from django.utils.module_loading import import_string
+from validate import is_boolean
 from validate import is_option
 from validate import Validator
 from validate import VdtTypeError
@@ -30,12 +30,15 @@ except NotImplementedError:
     psutil = None
 
 
-from kolibri.deployment.default.sqlite_db_names import ADDITIONAL_SQLITE_DATABASES
-from kolibri.plugins.utils.options import extend_config_spec
 from kolibri.utils.data import bytes_from_humans
 from kolibri.utils.i18n import KOLIBRI_LANGUAGE_INFO
 from kolibri.utils.i18n import KOLIBRI_SUPPORTED_LANGUAGES
+from kolibri.plugins.utils.options import extend_config_spec
+from kolibri.deployment.default.sqlite_db_names import (
+    ADDITIONAL_SQLITE_DATABASES,
+)
 from kolibri.utils.system import get_fd_limit
+
 
 logger = logging.getLogger(__name__)
 
@@ -248,6 +251,24 @@ def url_prefix(value):
     if not isinstance(value, str):
         raise VdtValueError(value)
     return value.lstrip("/").rstrip("/") + "/"
+
+
+def multiprocess_bool(value):
+    """
+    Validate the boolean value of a multiprocessing option.
+    Do this by checking it's a boolean, and also that multiprocessing
+    can be imported properly on this platform.
+    """
+    value = is_boolean(value)
+    try:
+        if not value:
+            raise ImportError()
+        # Import in order to check if multiprocessing is supported on this platform
+        from multiprocessing import synchronize  # noqa
+
+        return True
+    except ImportError:
+        return False
 
 
 def storage_option(value, *opts):
@@ -779,6 +800,14 @@ base_option_spec = {
         },
     },
     "Tasks": {
+        "USE_WORKER_MULTIPROCESSING": {
+            "type": "multiprocess_bool",
+            "default": False,
+            "description": """
+                Whether to use Python multiprocessing for worker pools. If False, then it will use threading. This may be useful,
+                if running on a dedicated device with multiple cores, and a lot of asynchronous tasks get run.
+            """,
+        },
         "REGULAR_PRIORITY_WORKERS": {
             "type": "integer",
             "default": 4,
@@ -814,6 +843,7 @@ def _get_validator():
             "port": port,
             "url_prefix": url_prefix,
             "bytes": validate_bytes,
+            "multiprocess_bool": multiprocess_bool,
             "storage_option": storage_option,
             "cache_option": cache_option,
             "lazy_import_callback_list": lazy_import_callback_list,
@@ -963,6 +993,7 @@ def _set_from_deprecated_aliases(conf):
 
 
 def read_options_file(ini_filename="options.ini"):
+
     from kolibri.utils.conf import KOLIBRI_HOME
 
     ini_path = os.path.join(KOLIBRI_HOME, ini_filename)
@@ -1024,6 +1055,7 @@ def read_options_file(ini_filename="options.ini"):
 
     # loop over any extraneous options and warn the user that we're ignoring them
     for sections, name in get_extra_values(conf):
+
         # this code gets the extra values themselves
         the_section = conf
         for section in sections:

@@ -5,6 +5,7 @@ from django.urls import reverse
 from django.utils import timezone
 from le_utils.constants import content_kinds
 
+from . import helpers
 from kolibri.core.auth.models import Classroom
 from kolibri.core.auth.models import Facility
 from kolibri.core.auth.test.helpers import KolibriAPITestCase as APITestCase
@@ -20,19 +21,18 @@ from kolibri.core.notifications.models import HelpReason
 from kolibri.core.notifications.models import LearnerProgressNotification
 from kolibri.core.notifications.models import NotificationEventType
 from kolibri.core.notifications.models import NotificationObjectType
-from kolibri.plugins.coach.viewsets.class_summary import COMPLETED
-from kolibri.plugins.coach.viewsets.class_summary import content_status_serializer
-from kolibri.plugins.coach.viewsets.class_summary import HELP_NEEDED
-from kolibri.plugins.coach.viewsets.class_summary import NOT_STARTED
-from kolibri.plugins.coach.viewsets.class_summary import STARTED
+from kolibri.plugins.coach.class_summary_api import COMPLETED
+from kolibri.plugins.coach.class_summary_api import content_status_serializer
+from kolibri.plugins.coach.class_summary_api import HELP_NEEDED
+from kolibri.plugins.coach.class_summary_api import NOT_STARTED
+from kolibri.plugins.coach.class_summary_api import STARTED
 from kolibri.utils.time_utils import local_now
-
-from . import helpers
 
 DUMMY_PASSWORD = "password"
 
 
 class ClassSummaryTestCase(EvaluationMixin, APITestCase):
+
     databases = "__all__"
 
     fixtures = ["content_test.json"]
@@ -253,6 +253,82 @@ class ClassSummaryTestCase(EvaluationMixin, APITestCase):
         response = self._get_detail_response()
         learner_data = response.data["learners"]
         self.assertTrue(all("picture_password" in learner for learner in learner_data))
+
+    def test_learner_data_excludes_qr_login_token(self):
+        # qr_login_token is a bearer login credential and must not be shipped in
+        # the bulk class-summary payload; it is resolved on demand via resolve_qr.
+        response = self._get_detail_response()
+        learner_data = response.data["learners"]
+        self.assertTrue(
+            all("qr_login_token" not in learner for learner in learner_data)
+        )
+
+    def _resolve_qr_url(self):
+        return reverse(self.basename + "-resolve-qr", kwargs={"pk": self.classroom.id})
+
+    def test_resolve_qr_returns_learner_for_valid_token(self):
+        learner = self.users[0]
+        learner.qr_login_token = "a" * 43
+        learner.save(update_fields=["qr_login_token"])
+        self.client.login(
+            username=self.classroom_coach.username, password=DUMMY_PASSWORD
+        )
+        response = self.client.post(
+            self._resolve_qr_url(),
+            data={"qr_login_token": "a" * 43},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["id"], learner.id)
+        self.assertEqual(response.data["name"], learner.full_name)
+
+    def test_resolve_qr_unknown_token_returns_404(self):
+        self.client.login(
+            username=self.classroom_coach.username, password=DUMMY_PASSWORD
+        )
+        response = self.client.post(
+            self._resolve_qr_url(),
+            data={"qr_login_token": "does-not-exist"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_resolve_qr_missing_token_returns_400(self):
+        self.client.login(
+            username=self.classroom_coach.username, password=DUMMY_PASSWORD
+        )
+        response = self.client.post(self._resolve_qr_url(), data={}, format="json")
+        self.assertEqual(response.status_code, 400)
+
+    def test_resolve_qr_token_for_learner_outside_class_returns_404(self):
+        # A globally-valid token whose learner is not a member of THIS classroom
+        # must not resolve, so a coach cannot probe tokens beyond their class.
+        outsider = self.learner
+        outsider.qr_login_token = "b" * 43
+        outsider.save(update_fields=["qr_login_token"])
+        self.client.login(
+            username=self.classroom_coach.username, password=DUMMY_PASSWORD
+        )
+        response = self.client.post(
+            self._resolve_qr_url(),
+            data={"qr_login_token": "b" * 43},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_resolve_qr_denied_for_coach_of_other_class(self):
+        learner = self.users[0]
+        learner.qr_login_token = "c" * 43
+        learner.save(update_fields=["qr_login_token"])
+        self.client.login(
+            username=self.another_classroom_coach.username, password=DUMMY_PASSWORD
+        )
+        response = self.client.post(
+            self._resolve_qr_url(),
+            data={"qr_login_token": "c" * 43},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
 
     def test_completed_exercise_with_help_notification_shows_completed(self):
         """Regression test for #14515: progress=1.0 should override help status."""

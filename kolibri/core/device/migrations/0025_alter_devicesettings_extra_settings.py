@@ -7,6 +7,7 @@ import kolibri.core.utils.validators
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("device", "0024_merge_usersyncstatus_updates"),
     ]

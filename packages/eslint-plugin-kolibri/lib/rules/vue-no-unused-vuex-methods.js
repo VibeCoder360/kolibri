@@ -1,5 +1,5 @@
 /**
- * @file Disallow unused Vuex mutations and actions.
+ * @fileoverview Disallow unused Vuex mutations and actions.
  */
 
 'use strict';

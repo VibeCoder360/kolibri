@@ -14,16 +14,13 @@ instead, at a different URL (e.g. with version number v2 instead of v1), leaving
 endpoint in place and maintained to the best extent possible so older clients can still use it.
 
 """
-
 from django.urls import include
 from django.urls import re_path
 from rest_framework import routers
 
-from kolibri.core.content.public_api import ImportMetadataViewset
-
-from ..auth.viewsets.facility import PublicFacilityViewSet
-from ..auth.viewsets.facility_user import PublicFacilityUserViewSet
-from ..auth.viewsets.signup import PublicSignUpViewSet
+from ..auth.api import PublicFacilityUserViewSet
+from ..auth.api import PublicFacilityViewSet
+from ..auth.api import PublicSignUpViewSet
 from .api import FacilitySearchUsernameViewSet
 from .api import get_public_channel_list
 from .api import get_public_channel_lookup
@@ -33,6 +30,8 @@ from .api import PublicChannelMetadataViewSet
 from .api import PublicContentNodeTreeViewSet
 from .api import PublicContentNodeViewSet
 from .api import SyncQueueAPIView
+from kolibri.core.content.public_api import ImportMetadataViewset
+
 
 router = routers.SimpleRouter()
 

@@ -6,7 +6,6 @@
   >
     <div
       class="modal-overlay"
-      role="presentation"
       @keyup.esc.stop="emitCloseEvent"
       @keyup.enter="goToNextContentNode"
     >
@@ -191,7 +190,7 @@
       const { genContentLinkKeepCurrentBackLink } = useContentLink();
       const { baseurl } = currentDeviceData();
       const { windowBreakpoint, windowHeight, windowWidth } = useKResponsiveWindow();
-      const { hasRole } = useUser();
+      const { isAdmin, isCoach, isSuperuser } = useUser();
       return {
         baseurl,
         canAccessUnassignedContent,
@@ -200,7 +199,9 @@
         windowBreakpoint,
         windowHeight,
         windowWidth,
-        hasRole,
+        isAdmin,
+        isCoach,
+        isSuperuser,
       };
     },
     props: {
@@ -374,7 +375,7 @@
             ? this.contentNode.ancestors.slice(-2)[0].id
             : this.contentNode.parent,
           params: {
-            include_coach_content: this.hasRole,
+            include_coach_content: this.isAdmin || this.isCoach || this.isSuperuser,
             depth: fetchGrandparent ? 2 : 1,
             baseurl: this.baseurl,
           },
@@ -412,9 +413,9 @@
         this.$router.push(this.nextContentNodeRoute);
       },
       /**
-       * Handles focus events to trap focus within the modal when appropriate.
-       * @param {Event} event - The focus event to evaluate.
        * @public
+       * Focuses on correct first element for FocusTrap depending on content
+       * rendered in CompletionModal.
        */
       focusElementTest(event) {
         const { target } = event;

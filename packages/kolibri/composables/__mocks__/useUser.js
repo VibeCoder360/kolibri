@@ -8,7 +8,7 @@
  * If you need to override some default values from some tests,
  * you can import a helper function `useUserMock` that accepts
  * an object with values to be overriden and use it together
- * with  `mockImplementation`, as shown in the example below.
+ * with  `mockImplementation` as follows:
  *
  * ```
  * // eslint-disable-next-line import-x/named
@@ -17,9 +17,9 @@
  * jest.mock('<useUser file path>')
  *
  * it('test', () => {
- * useUser.mockImplementation(
- * () => useUserMock({ isUserLoggedIn: true })
- * );
+ *   useUser.mockImplementation(
+ *     () => useUserMock({ isUserLoggedIn: true })
+ *   );
  * })
  * ```
  *
@@ -55,7 +55,7 @@ const MOCK_DEFAULTS = {
   isFacilityAdmin: false,
   userPermissions: {},
   userFacilityId: undefined,
-  hasRole: false,
+  userKind: UserKinds.ANONYMOUS,
   userHasPermissions: false,
   session,
   //state
@@ -67,11 +67,6 @@ export function useUserMock(overrides = {}) {
     ...MOCK_DEFAULTS,
     ...overrides,
   };
-  // Derive hasRole from role flags unless explicitly overridden, consistent with useUser.js.
-  // isAdmin in the real composable includes superusers, so isSuperuser must also set hasRole.
-  if (!('hasRole' in overrides)) {
-    mocks.hasRole = mocks.isCoach || mocks.isAdmin || mocks.isSuperuser;
-  }
   const computedMocks = {};
   for (const key in mocks) {
     if (typeof mocks[key] !== 'function') {

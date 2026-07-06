@@ -29,7 +29,7 @@ SILKY_PYTHON_PROFILER = True
 SILKY_AUTHENTICATION = False
 SILKY_AUTHORISATION = False
 # Limit stored requests in dev
-SILKY_MAX_RECORDED_REQUESTS = 10**3
+SILKY_MAX_RECORDED_REQUESTS = 10 ** 3
 SILKY_MAX_RECORDED_REQUESTS_CHECK_PERCENT = 10
 
 
@@ -47,6 +47,7 @@ REST_FRAMEWORK = {
         "kolibri.deployment.default.renderers.LightBrowsableAPIRenderer",
     ),
     "EXCEPTION_HANDLER": "kolibri.core.utils.exception_handler.custom_exception_handler",
+    "DEFAULT_THROTTLE_RATES": {"session_signin": "120/min"},
 }
 
 SWAGGER_SETTINGS = {"DEFAULT_INFO": "kolibri.deployment.default.dev_urls.api_info"}

@@ -139,9 +139,10 @@
                   class="active-unit-title"
                   :style="activeUnitTitleStyles"
                 >
+                  <!-- TODO: Replace :to with real route once unit detail route is available -->
                   <KRouterLink
                     :text="activeUnit.numberedTitle"
-                    :to="unitDetailRouteFor(activeUnit.id)"
+                    :to="{}"
                   />
                   <div class="unit-status">
                     <span
@@ -191,9 +192,10 @@
                       class="upcoming-unit"
                       :style="{ border: `1px solid ${$themeTokens.fineLine}` }"
                     >
+                      <!-- TODO: Replace :to with real route once unit detail route is available -->
                       <KRouterLink
                         :text="unit.numberedTitle"
-                        :to="unitDetailRouteFor(unit.id)"
+                        :to="{}"
                       />
                     </div>
                   </template>
@@ -214,9 +216,10 @@
                       class="upcoming-unit"
                       :style="{ border: `1px solid ${$themeTokens.fineLine}` }"
                     >
+                      <!-- TODO: Replace :to with real route once unit detail route is available -->
                       <KRouterLink
                         :text="unit.numberedTitle"
-                        :to="unitDetailRouteFor(unit.id)"
+                        :to="{}"
                       />
                       <span :style="{ color: $themeTokens.annotation }">
                         <KIcon
@@ -240,9 +243,10 @@
                   class="active-unit-title"
                   :style="activeUnitTitleStyles"
                 >
+                  <!-- TODO: Replace :to with real route once unit detail route is available -->
                   <KRouterLink
                     :text="activeUnit.numberedTitle"
-                    :to="unitDetailRouteFor(activeUnit.id)"
+                    :to="{}"
                   />
                   <div class="unit-status">
                     <span
@@ -730,10 +734,6 @@
         return { classId: route.params.classId, courseSessionId: route.params.courseSessionId };
       }
 
-      function unitDetailRouteFor(unitContentnodeId) {
-        return { name: PageNames.UNIT_DETAIL, params: { ...courseParams(), unitContentnodeId } };
-      }
-
       function onTabClick(tabId) {
         router.push({ name: TAB_ROUTE_NAMES[tabId], params: courseParams() });
       }
@@ -1034,7 +1034,6 @@
         deleteCourseFromSummaryConfirmation$,
         deleteAction$,
         refreshCourseSessionData,
-        unitDetailRouteFor,
       };
     },
   };

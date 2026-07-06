@@ -76,7 +76,6 @@
     },
     methods: {
       /**
-       * Triggers a CSV download of the learner progress data currently displayed in the table.
        * @public
        */
       exportCSV() {

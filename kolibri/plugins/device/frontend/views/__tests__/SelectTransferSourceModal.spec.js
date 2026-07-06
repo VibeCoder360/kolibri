@@ -1,40 +1,46 @@
-import { render, screen } from '@testing-library/vue';
-import { createTranslator } from 'kolibri/utils/i18n';
+import { shallowMount } from '@vue/test-utils';
 import SelectTransferSourceModal from '../ManageContentPage/SelectTransferSourceModal';
-import SelectDriveModal from '../ManageContentPage/SelectTransferSourceModal/SelectDriveModal';
-import SelectImportSourceModal from '../ManageContentPage/SelectTransferSourceModal/SelectImportSourceModal';
 import { makeAvailableChannelsPageStore } from '../../__tests__/utils/makeStore';
 
-jest.mock('kolibri/client');
-jest.mock('kolibri/urls');
+function makeWrapper(options) {
+  const wrapper = shallowMount(SelectTransferSourceModal, {
+    ...options,
+    stubs: {
+      SelectImportSourceModal: {
+        template: '<div data-testid="select-import-source"></div>',
+      },
+      SelectDriveModal: {
+        template: '<div data-testid="select-drive"></div>',
+      },
+    },
+  });
+  const els = {
+    titleText: () => wrapper.find({ name: 'KModal' }).props().title,
+    selectImportSource: () => wrapper.find('[data-testid="select-import-source"]'),
+    selectDrive: () => wrapper.find('[data-testid="select-drive"]'),
+  };
+  return { wrapper, els };
+}
 
-SelectDriveModal.methods.refreshDriveList = jest.fn().mockResolvedValue();
-
-const { network$ } = createTranslator(SelectImportSourceModal.name, SelectImportSourceModal.$trs);
-const { selectDrive$ } = createTranslator(SelectDriveModal.name, SelectDriveModal.$trs);
-
-describe('SelectTransferSourceModal', () => {
+describe('selectImportSourceModal component', () => {
   let store;
 
   beforeEach(() => {
     store = makeAvailableChannelsPageStore();
-    store.commit('manageContent/wizard/SET_DRIVE_LIST', []);
   });
 
   it('when at select source stage, shows correct modal', () => {
-    render(SelectTransferSourceModal, {
-      props: { pageName: 'SELECT_IMPORT_SOURCE' },
-      store,
-    });
-    expect(screen.getByText(network$())).toBeInTheDocument();
+    const { els } = makeWrapper({ store, propsData: { pageName: 'SELECT_IMPORT_SOURCE' } });
+    expect(els.selectImportSource().exists()).toEqual(true);
+    expect(els.selectDrive().exists()).toEqual(false);
   });
 
   it('when exporting or local importing, shows the correct modal', () => {
-    render(SelectTransferSourceModal, {
-      props: { pageName: 'SELECT_DRIVE' },
-      store,
-    });
-    expect(screen.queryByText(network$())).not.toBeInTheDocument();
-    expect(screen.getByText(selectDrive$())).toBeInTheDocument();
+    const { els } = makeWrapper({ store, propsData: { pageName: 'SELECT_DRIVE' } });
+    expect(els.selectDrive().exists()).toEqual(true);
+    expect(els.selectImportSource().exists()).toEqual(false);
   });
+
+  // not tested:
+  // whether correct form is showing
 });

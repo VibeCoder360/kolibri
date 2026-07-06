@@ -1,4 +1,5 @@
 name: Build WHL file
+
 on:
   workflow_call:
     outputs:
@@ -8,88 +9,70 @@ on:
       tar-file-name:
         description: "TAR file name"
         value: ${{ jobs.build_whl.outputs.tar-file-name }}
+
 permissions:
   contents: read
+
 jobs:
   build_whl:
     name: Build WHL
     runs-on: ubuntu-latest
+    container:
+      image: python:3.6-buster
     outputs:
       whl-file-name: ${{ steps.get-whl-filename.outputs.whl-file-name }}
       tar-file-name: ${{ steps.get-tar-filename.outputs.tar-file-name }}
     steps:
-      - name: Install Ubuntu dependencies
-        run: |
-          sudo apt-get -y -qq update
-          sudo apt-get install -y gettext sqlite3 binutils-aarch64-linux-gnu binutils-arm-linux-gnueabihf
-      - uses: actions/checkout@v6.0.2
-        with:
-          fetch-depth: 0
-          lfs: true
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v8.1.0
-        with:
-          enable-cache: true
-          cache-python: true
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6.0.8
-      - name: Use Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: 'package.json'
-          cache: 'pnpm'
-      - name: Install Javascript dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Set Kolibri version from tag (fork override)
-        # School fork customization: the upstream pyproject.toml tag_regex only
-        # accepts vX.Y.Z or vX.Y.Z-{alpha,beta,rc}N. Our school tags
-        # (v0.19.4-schoolN) don't match, which makes setuptools-scm 9.x assert
-        # at parse time during `uv sync` (which builds Kolibri as a package).
-        # SETUPTOOLS_SCM_PRETEND_VERSION bypasses parsing entirely.
-        # MUST run BEFORE `uv sync --group dev`.
-        # See SCHOOL_FORK_CHANGES.md.
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: bash
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          VERSION="${VERSION//-school/.post}"
-          echo "Pretending version: $VERSION (from tag $GITHUB_REF_NAME)"
-          echo "SETUPTOOLS_SCM_PRETEND_VERSION=$VERSION" >> "$GITHUB_ENV"
-      - name: Install Python dependencies
-        run: uv sync --group dev
-      # Restore the webpack filesystem cache so PR builds only recompile their
-      # own diff. The unique key always misses (forcing a fresh save at job end),
-      # while restore-keys pulls the most recent cache for the same lockfile —
-      # primed on `develop` by warm_build_cache.yml so fork PRs get a hit too.
-      - name: Cache webpack build
-        uses: actions/cache@v6.0.0
-        with:
-          path: node_modules/.cache/webpack
-          key: webpack-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
-          restore-keys: |
-            webpack-${{ hashFiles('pnpm-lock.yaml') }}-
-      # The bundled C extensions are pinned wheels that change only when the
-      # cext requirements change, so an exact-match key is enough — no re-download
-      # once `develop` has primed it. `.cext_cache` is the pip cache dir that the
-      # `staticdeps-cext` Makefile target writes to (via --cache-path).
-      - name: Cache C extension downloads
-        uses: actions/cache@v6.0.0
-        with:
-          path: .cext_cache
-          key: cext-${{ hashFiles('requirements/cext.txt', 'requirements/cext_noarch.txt') }}
-      - name: Build Kolibri
-        run: make dist
-      - name: Get WHL filename
-        id: get-whl-filename
-        run: echo "whl-file-name=$(basename dist/*.whl)" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ${{ steps.get-whl-filename.outputs.whl-file-name }}
-          path: dist/${{ steps.get-whl-filename.outputs.whl-file-name }}
-      - name: Get TAR filename
-        id: get-tar-filename
-        run: echo "tar-file-name=$(basename dist/*.tar.gz)" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ${{ steps.get-tar-filename.outputs.tar-file-name }}
-          path: dist/${{ steps.get-tar-filename.outputs.tar-file-name }}
+    - name: Install Ubuntu dependencies
+      run: |
+        echo "deb http://archive.debian.org/debian-archive/debian/ buster main" > /etc/apt/sources.list
+        echo "deb http://archive.debian.org/debian-archive/debian-security/ buster/updates main" >> /etc/apt/sources.list
+        echo "Acquire::Check-Valid-Until \"false\";" > /etc/apt/apt.conf.d/99archive
+        apt-get -y -qq update
+        apt-get install -y gettext sudo sqlite3 binutils-aarch64-linux-gnu binutils-arm-linux-gnueabihf git-lfs
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+        lfs: true
+    - name: Use Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version-file: 'package.json'
+    - name: Install pnpm
+      uses: pnpm/action-setup@v6.0.3
+      with:
+        cache: true
+    - name: Install Javascript dependencies
+      run: pnpm install --frozen-lockfile
+    - name: Cache Python dependencies
+      uses: actions/cache@v5
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements/*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    - name: Cache C extensions
+      uses: actions/cache@v5
+      with:
+        path: cext_cache
+        key: ${{ runner.os }}-cext-${{ hashFiles('requirements/cext*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-cext-
+    - name: Install Python build dependencies
+      run: pip install -r requirements/build.txt
+    - name: Build Kolibri
+      run: make dist
+    - name: Get WHL filename
+      id: get-whl-filename
+      run: echo "whl-file-name=$(ls dist | grep .whl | cat)" >> $GITHUB_OUTPUT
+    - uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.get-whl-filename.outputs.whl-file-name }}
+        path: dist/${{ steps.get-whl-filename.outputs.whl-file-name }}
+    - name: Get TAR filename
+      id: get-tar-filename
+      run: echo "tar-file-name=$(ls dist | grep .tar | cat)" >> $GITHUB_OUTPUT
+    - uses: actions/upload-artifact@v7
+      with:
+        name: ${{ steps.get-tar-filename.outputs.tar-file-name }}
+        path: dist/${{ steps.get-tar-filename.outputs.tar-file-name }}

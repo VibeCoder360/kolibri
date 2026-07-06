@@ -10,21 +10,10 @@ import { DateRangeFilters } from '../constants';
 
 /**
  * Composable to manage user filters in the user management pages.
- * @param {object} options - Composable options.
- * @param {import('vue').Ref<Array<{id: string, name: string}>>} options.classes - Ref to the
- * list of classes available for filtering.
- * @returns {{
- *   routeFilters: import('vue').ComputedRef<object>,
- *   workingFilters: object,
- *   numAppliedFilters: import('vue').ComputedRef<number>,
- *   classesOptions: import('vue').ComputedRef<Array<{id: string, label: string}>>,
- *   userFilterOptions: Array<{id: string, label: string, icon: string}>,
- *   creationDateOptions: Array<{value: string, label: string, dateSubtraction?: object}>,
- *   applyFilters: (options?: {nextRouteName?: string}) => void,
- *   resetFilters: () => void,
- *   getBackendFilters: () => object,
- *   resetWorkingFilters: () => void,
- * }} The user-filter state, options, and methods.
+ *
+ * @param {object} options
+ * @param {Array} options.classes - Ref to the list of classes available for filtering.
+ * @returns
  */
 export default function useUsersFilters({ classes }) {
   const router = useRouter();
@@ -145,9 +134,10 @@ export default function useUsersFilters({ classes }) {
    * Apply the current filters to the route by updating the query parameters,
    * and pushing the new route. This will remove from the query any filters
    * that are not longer applied, but will leave any other query parameters intact.
-   * @param {object} [options] - Routing overrides applied alongside the new query.
-   * @param {string} [options.nextRouteName] - The name of the route to navigate to
-   * after applying filters; defaults to the current route name.
+   *
+   * @param {object} options
+   * @param {string} options.nextRouteName - The name of the route to navigate to
+   *                                         after applying filters.
    */
   const applyFilters = ({ nextRouteName } = {}) => {
     const nextQuery = { ...route.query };

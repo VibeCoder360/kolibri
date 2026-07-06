@@ -12,7 +12,6 @@ system/windows.py
 
 etc..
 """
-
 import logging
 import os
 import shutil
@@ -127,6 +126,7 @@ class _WindowsNullDevice:
 
 
 def get_free_space(path=KOLIBRI_HOME):
+
     path = os.path.realpath(path)
 
     while path and not os.path.exists(path) and not os.path.isdir(path):

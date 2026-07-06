@@ -4,6 +4,7 @@ from django.db import models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
         ("courses", "0003_unittestassignment_closed_field"),
     ]

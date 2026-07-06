@@ -1,15 +1,19 @@
 name: Update contributors in AUTHORS.md
-# Disabled on school fork — needs LE Bot secrets. See SCHOOL_FORK_CHANGES.md.
+
 on:
+  schedule:
+    - cron: '0 0 1 * *'  # 1st of each month, 00:00 UTC
   workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
       - name: Run updater
@@ -21,7 +25,7 @@ jobs:
         with:
           app-id: ${{ secrets.LE_BOT_APP_ID }}
           private-key: ${{ secrets.LE_BOT_PRIVATE_KEY }}
-      - uses: peter-evans/create-pull-request@v8
+      - uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ steps.token.outputs.token }}
           branch: bot/update-contributors

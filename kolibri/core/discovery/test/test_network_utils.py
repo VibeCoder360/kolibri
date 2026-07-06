@@ -3,7 +3,6 @@ import requests
 from django.test import TestCase
 
 import kolibri
-
 from ..models import ConnectionStatus
 from ..models import LocationTypes
 from ..models import NetworkLocation
@@ -363,7 +362,7 @@ class NetworkClientTestCase(TestCase):
                 dict(
                     min_content_schema_version=None,
                     subset_of_users_device=False,
-                    **mock_device_info,
+                    **mock_device_info
                 ),
             )
 
@@ -379,7 +378,7 @@ class NetworkClientTestCase(TestCase):
                 dict(
                     min_content_schema_version=None,
                     subset_of_users_device=False,
-                    **mock_device_info,
+                    **mock_device_info
                 ),
             )
 

@@ -6,6 +6,7 @@ from django.db import models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [("discovery", "0001_initial")]
 
     operations = [

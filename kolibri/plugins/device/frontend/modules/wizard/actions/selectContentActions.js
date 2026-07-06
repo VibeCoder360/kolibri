@@ -4,9 +4,8 @@ import { downloadChannelMetadata } from '../utils';
 import { getChannelWithContentSizes } from '../apiChannelMetadata';
 
 /**
- * Loads channel metadata for the current transfer, downloading it if needed.
- * @param {object} store - The Vuex store instance with wizard state.
- * @returns {Promise<void>} Resolves when channel metadata has been loaded into the store.
+ * Transitions the import/export wizard to the 'load-channel-metadata' interstitial state
+ *
  */
 export function loadChannelMetadata(store) {
   let dbPromise;
@@ -49,9 +48,13 @@ export function loadChannelMetadata(store) {
 }
 
 /**
- * Gets the available free space on a drive, or on the device's content storage if no drive given.
- * @param {object} selectedDrive - Optional drive object with a freespace property.
- * @returns {Promise<number>} Resolves with the available free space in bytes, or -1 on error.
+ * Makes a call to freespace API and places result in the store.
+ * If transfer type is LOCALEXPORT, it gets the selected drive's freespace.
+ *
+ * @param {string} path - Path to the Kolibri data folder.
+ * If empty, defaults to server's KOLIBRI_HOME.
+ * @returns {Promise}
+ *
  */
 export function getAvailableSpaceOnDrive(selectedDrive) {
   if (selectedDrive) {

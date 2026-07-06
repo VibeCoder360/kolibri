@@ -1,7 +1,6 @@
 """
 The permissions classes in this module define the specific permissions that govern access to the models in the auth app.
 """
-
 from django.db.models import Q
 
 from ..constants.collection_kinds import ADHOCLEARNERSGROUP
@@ -76,6 +75,7 @@ class FacilityAdminCanEditForOwnFacilityDataset(BasePermissions):
         return hasattr(user, "dataset") and user.dataset_id == obj.id
 
     def _user_is_admin_for_related_facility(self, user, obj=None):
+
         # import here to avoid circular imports
         from ..models import FacilityDataset
 

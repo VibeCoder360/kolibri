@@ -1,7 +1,6 @@
 """
 Utility function for checking module availability.
 """
-
 from importlib.util import find_spec
 
 

@@ -64,10 +64,11 @@
       UpdateNotification,
     },
     setup() {
-      const { isAdmin, currentUserId } = useUser();
+      const { isAdmin, isSuperuser, currentUserId } = useUser();
 
       return {
         isAdmin,
+        isSuperuser,
         currentUserId,
         error,
         handleApiError,
@@ -117,7 +118,7 @@
       },
       showNotification() {
         if (
-          this.isAdmin &&
+          (this.isAdmin || this.isSuperuser) &&
           !Lockr.get(UPDATE_MODAL_DISMISSED) &&
           this.notificationModalShown &&
           this.notifications.length !== 0
@@ -156,7 +157,7 @@
 
     methods: {
       async getNotifications() {
-        if (this.isAdmin) {
+        if (this.isAdmin || this.isSuperuser) {
           try {
             const notifications = await PingbackNotificationResource.fetchCollection();
             this.notifications = _notificationListState(notifications);

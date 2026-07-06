@@ -1,20 +1,14 @@
 import videojs from 'video.js';
 
 /**
- * Build a base class extending the named video.js menu button component, with
- * additional behaviour for hiding the menu on mouseleave and dismissing it on
- * outside clicks.
- * @param {string} videojsComponent - The name of the videojs component to extend.
- * @returns {Function} A class extending the requested videojs component.
+ * @param {String} videojsComponent A string of the videojs component to extend
  */
 export default function videojsButtonMixin(videojsComponent) {
   return class extends videojs.getComponent(videojsComponent) {
     /**
-     * Wire up the mouseleave-to-hide behaviour and the outside-click listener used
-     * to dismiss the menu.
-     * @param {object} player - The video.js player instance.
-     * @param {object} [options] - Component options forwarded to videojs.
-     * @param {Function} [ready] - Optional ready callback forwarded to videojs.
+     * @param player
+     * @param options
+     * @param ready
      */
     constructor(player, options, ready) {
       super(player, options, ready);
@@ -35,9 +29,8 @@ export default function videojsButtonMixin(videojsComponent) {
     }
 
     /**
-     * Should build and return an instance of a Video.js Menu. The base
-     * implementation throws; subclasses must override.
-     * @throws {Error} Always — subclasses must override this method.
+     * Should build and return an instance of a Video.js Menu
+     * @return {Menu}
      */
     buildMenu() {
       throw new Error('Not implemented');
@@ -45,8 +38,7 @@ export default function videojsButtonMixin(videojsComponent) {
 
     /**
      * @override
-     * @returns {object} A configured video.js Menu, populated with items and wired up to
-     * the outside-click listener.
+     * @return {Menu}
      */
     createMenu() {
       if (this.items) {
@@ -73,10 +65,10 @@ export default function videojsButtonMixin(videojsComponent) {
     }
 
     /**
-     * Removes the `vjs-menu-button-popup` class that adds specific functionality
-     * we don't want.
-     * @param {string} classNames - Space-separated class string to filter.
-     * @returns {string} The class string without the popup class.
+     * Removes class that adds specific functionality we don't want
+     *
+     * @param {String} classNames
+     * @return {String}
      */
     removePopupClass(classNames) {
       return classNames.replace(/\bvjs-menu-button-popup\b/, ' ');

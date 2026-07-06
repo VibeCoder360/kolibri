@@ -4,9 +4,6 @@ from argparse import SUPPRESS
 from django.core.management.base import BaseCommand
 from sqlalchemy.exc import DatabaseError
 
-from kolibri.core.content.models import ChannelMetadata
-from kolibri.core.content.utils.paths import get_all_content_dir_paths
-
 from ...utils.annotation import set_content_visibility_from_disk
 from ...utils.channel_import import FutureSchemaError
 from ...utils.channel_import import import_channel_from_local_db
@@ -14,6 +11,8 @@ from ...utils.channel_import import InvalidSchemaVersionError
 from ...utils.channels import get_channel_ids_for_content_dirs
 from ...utils.channels import read_channel_metadata_from_db_file
 from ...utils.paths import get_content_database_file_path
+from kolibri.core.content.models import ChannelMetadata
+from kolibri.core.content.utils.paths import get_all_content_dir_paths
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +27,7 @@ class Command(BaseCommand):
     help = "Scan content and databases in Kolibri folder and updates the database to show if available"
 
     def add_arguments(self, parser):
+
         channel_import_mode_help_text = """
         Specify the desired behavior for import of channel metadata databases. Value must be one of:
         - newer: only import if database version is higher than what we already have (default)
@@ -72,6 +72,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+
         channel_import_mode = options["channel_import_mode"]
         channels_to_include = options["channels"]
         skip_annotations = options["skip_annotations"]

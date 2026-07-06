@@ -1,8 +1,8 @@
 from rest_framework import routers
 
-from .viewsets.analytics import LocalNotificationViewSet
-from .viewsets.analytics import PingbackNotificationDismissedViewSet
-from .viewsets.analytics import PingbackNotificationViewSet
+from .api import LocalNotificationViewSet
+from .api import PingbackNotificationDismissedViewSet
+from .api import PingbackNotificationViewSet
 
 router = routers.SimpleRouter()
 

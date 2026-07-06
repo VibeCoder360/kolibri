@@ -2,13 +2,12 @@ from django.core.management import call_command
 from django.test import TransactionTestCase
 from mock import patch
 
+from .sqlalchemytesting import django_connection_engine
 from kolibri.core.content.models import File
 from kolibri.core.content.models import LocalFile
 from kolibri.core.content.utils.importability_annotation import (
     get_channel_annotation_stats,
 )
-
-from .sqlalchemytesting import django_connection_engine
 
 
 def get_engine(connection_string):
@@ -22,6 +21,7 @@ file_id_2 = "e00699f859624e0f875ac6fe1e13d648"
 
 @patch("kolibri.core.content.utils.sqlalchemybridge.get_engine", new=get_engine)
 class ImportabilityStats(TransactionTestCase):
+
     fixtures = ["content_test.json"]
 
     def test_all_files(self):

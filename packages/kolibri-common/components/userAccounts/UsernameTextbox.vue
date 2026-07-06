@@ -92,16 +92,13 @@
     },
     methods: {
       /**
-       * Accessible via parent component refs.
-       * @returns {void}
-       * @public
+       *  @public
        */
       focus() {
         return this.$refs.textbox.focus();
       },
       /**
-       * Accessible via parent component refs.
-       * @public
+       *  @public
        */
       reset() {
         this.blurred = false;

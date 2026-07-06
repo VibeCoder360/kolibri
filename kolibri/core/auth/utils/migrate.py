@@ -21,6 +21,7 @@ from kolibri.core.logger.models import ContentSummaryLog
 from kolibri.core.logger.models import MasteryLog
 from kolibri.core.logger.models import UserSessionLog
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -69,7 +70,7 @@ def merge_users(source_user, target_user):  # noqa C901
         },
     }
 
-    def _merge_log_data(LogModel):  # noqa: C901
+    def _merge_log_data(LogModel):
         log_map = {}
         id_map[LogModel] = log_map
         new_logs = []

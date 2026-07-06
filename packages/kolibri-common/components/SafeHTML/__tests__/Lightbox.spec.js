@@ -34,8 +34,7 @@ describe('Lightbox', () => {
   let user, lightboxDialog, img, zoomOut, zoomIn, close, emitted;
   beforeEach(async () => {
     user = userEvent.setup();
-    const result = renderComponent();
-    emitted = result.emitted;
+    emitted = renderComponent().emitted;
 
     lightboxDialog = screen.getByTestId('lightbox-dialog');
     img = screen.getByAltText(sampleAlt);

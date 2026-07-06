@@ -7,7 +7,6 @@ https://docs.djangoproject.com/en/3.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.2/ref/settings/
 """
-
 import os
 import sys
 from urllib.parse import urljoin
@@ -27,6 +26,7 @@ from kolibri.plugins.utils.settings import apply_settings
 from kolibri.utils import conf
 from kolibri.utils import i18n
 from kolibri.utils.logger import get_logging_config
+
 
 try:
     isolation_level = None
@@ -359,10 +359,8 @@ except (pytz.UnknownTimeZoneError, ValueError, ZoneInfoNotFoundError):
 
 # Fixes https://github.com/regebro/tzlocal/issues/44
 # tzlocal 1.4 returns 'local' if unable to detect the timezone,
-# and this TZ id is invalid. get_localzone_name() also returns None
-# in containers where /etc/localtime is a plain bind-mounted file with
-# no TZ env or /etc/timezone.
-if TIME_ZONE is None or TIME_ZONE == "local":
+# and this TZ id is invalid
+if TIME_ZONE == "local":
     TIME_ZONE = pytz.utc.zone
 
 USE_I18N = True
@@ -431,6 +429,13 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_CONTENT_NEGOTIATION_CLASS": "kolibri.core.negotiation.LimitContentNegotiation",
     "EXCEPTION_HANDLER": "kolibri.core.utils.exception_handler.custom_exception_handler",
+    # Keyed by client IP for anonymous requests, so this caps all sign-in
+    # methods together. Kept high enough that a classroom of learners signing
+    # in at once (potentially behind a shared NAT/proxy) is not falsely locked
+    # out; brute-force is not the concern for QR login given 256-bit tokens.
+    "DEFAULT_THROTTLE_RATES": {
+        "session_signin": "120/min",
+    },
 }
 
 # System warnings to disable

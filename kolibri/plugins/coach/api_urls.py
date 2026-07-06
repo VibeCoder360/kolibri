@@ -2,14 +2,14 @@ from django.urls import include
 from django.urls import re_path
 from rest_framework import routers
 
-from .viewsets.class_summary import ClassSummaryViewSet
-from .viewsets.classroom_notifications import ClassroomNotificationsViewset
-from .viewsets.difficult_questions import ExerciseDifficultQuestionsViewset
-from .viewsets.difficult_questions import PracticeQuizDifficultQuestionsViewset
-from .viewsets.difficult_questions import QuizDifficultQuestionsViewset
-from .viewsets.lesson_report import LessonReportViewset
-from .viewsets.unit_lesson_progress import UnitLessonProgressViewSet
-from .viewsets.unit_report import UnitReportViewSet
+from .api import ClassroomNotificationsViewset
+from .api import ExerciseDifficultQuestionsViewset
+from .api import LessonReportViewset
+from .api import PracticeQuizDifficultQuestionsViewset
+from .api import QuizDifficultQuestionsViewset
+from .class_summary_api import ClassSummaryViewSet
+from .unit_lesson_progress_api import UnitLessonProgressViewSet
+from .unit_report_api import UnitReportViewSet
 
 router = routers.DefaultRouter()
 
@@ -42,6 +42,6 @@ urlpatterns = [
     re_path(
         r"^coursesession/(?P<course_session_id>[0-9a-fA-F]{32})/unit/(?P<unit_contentnode_id>[0-9a-fA-F]{32})/lessonprogress/$",
         UnitLessonProgressViewSet.as_view({"get": "retrieve"}),
-        name="unit_lesson_progress",
+        name="unit-lesson-progress",
     ),
 ]

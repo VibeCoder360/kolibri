@@ -4,7 +4,6 @@ user template tags
 ========================
 Tags for including plugin javascript assets into a template.
 """
-
 from django import template
 
 from .. import hooks

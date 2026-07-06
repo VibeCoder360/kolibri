@@ -15,7 +15,6 @@ To use
     {% base_frontend_async %}
 
 """
-
 from django import template
 
 from .. import hooks

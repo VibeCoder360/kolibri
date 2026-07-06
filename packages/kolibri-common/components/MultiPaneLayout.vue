@@ -83,7 +83,6 @@
     },
     methods: {
       /**
-       * Scrolls the main content panel to the top.
        * @public
        */
       scrollMainToTop() {

@@ -10,6 +10,25 @@ export default new Resource({
       method: 'DELETE',
     });
   },
+  rotateQrToken(user_id) {
+    return client({
+      url: urls['kolibri:core:facilityuser_rotate_qr_token'](user_id),
+      method: 'POST',
+    });
+  },
+  assignQrToken(user_id) {
+    return client({
+      url: urls['kolibri:core:facilityuser_assign_qr_token'](user_id),
+      method: 'POST',
+    });
+  },
+  assignQrTokens(user_ids) {
+    return client({
+      url: urls['kolibri:core:facilityuser_assign_qr_tokens'](),
+      method: 'POST',
+      data: { user_ids },
+    });
+  },
   async listRemoteFacilityLearners(params) {
     const { data } = await client({
       url: urls['kolibri:core:remotefacilityauthenticateduserinfo'](),

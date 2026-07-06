@@ -5,6 +5,8 @@ from mock import Mock
 from morango.models import Filter
 from morango.sync.utils import SyncSignalGroup
 
+from .helpers import create_dummy_facility_data
+from .helpers import provision_device
 from kolibri.core.auth.constants.morango_sync import PARTITION_CLASSROOM
 from kolibri.core.auth.constants.morango_sync import PARTITION_SUFFIX_COACH_RW
 from kolibri.core.auth.constants.morango_sync import PARTITION_SUFFIX_LEARNER_RW
@@ -22,9 +24,6 @@ from kolibri.core.exams.models import Exam
 from kolibri.core.exams.models import ExamAssignment
 from kolibri.core.lessons.models import Lesson
 from kolibri.core.lessons.models import LessonAssignment
-
-from .helpers import create_dummy_facility_data
-from .helpers import provision_device
 
 
 class TestProgressTracking(TestCase):
@@ -304,6 +303,7 @@ class ClassroomPartitionFactoryTestCase(TestCase):
 
 
 class ClassroomPartitionFilterFactoryTestCase(TestCase):
+
     databases = "__all__"
 
     @classmethod

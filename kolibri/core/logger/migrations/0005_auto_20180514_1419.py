@@ -4,6 +4,7 @@ from django.db import models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [("logger", "0004_tidy_progress_range")]
 
     operations = [

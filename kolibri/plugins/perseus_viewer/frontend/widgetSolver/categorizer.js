@@ -1,5 +1,11 @@
 export default (widget, rubric) => {
-  widget.props.handleUserInput({
-    values: rubric.values,
-  });
+  const values = rubric.values;
+
+  widget.props.onChange(
+    {
+      values,
+    },
+    null, // cb
+    false, // silent
+  );
 };

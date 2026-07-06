@@ -45,6 +45,7 @@ from kolibri.utils.server.hooks import KolibriProcessHook
 from kolibri.utils.system import become_daemon
 from kolibri.utils.system import pid_exists
 
+
 logger = logging.getLogger(__name__)
 
 # Status codes for kolibri
@@ -260,8 +261,8 @@ class DefaultScheduledTasksPlugin(SimplePlugin):
     def START(self):
         from kolibri.core.analytics.tasks import schedule_local_notification_generation
         from kolibri.core.analytics.tasks import schedule_ping
-        from kolibri.core.deviceadmin.tasks import schedule_streamed_cache_cleanup
         from kolibri.core.deviceadmin.tasks import schedule_vacuum
+        from kolibri.core.deviceadmin.tasks import schedule_streamed_cache_cleanup
 
         # schedule the pingback job if not already scheduled
         schedule_ping()
@@ -285,7 +286,9 @@ class ServicesPlugin(SimplePlugin):
         from kolibri.core.tasks.main import initialize_workers
 
         # Initialize the iceqube engine to handle queued tasks
-        self.worker = initialize_workers()
+        # Add a loose coupling between our LogPlugin and the ServicesPlugin
+        # by getting any log_queue that might be present on the bus
+        self.worker = initialize_workers(log_queue=getattr(self.bus, "log_queue", None))
 
     def STOP(self):
         if self.worker is not None:
@@ -334,8 +337,8 @@ class ZeroConfPlugin(Monitor):
         # Register the Kolibri zeroconf service so it will be discoverable on the network
         from kolibri.core.discovery.utils.network.broadcast import (
             build_broadcast_instance,
+            KolibriBroadcast,
         )
-        from kolibri.core.discovery.utils.network.broadcast import KolibriBroadcast
         from kolibri.core.discovery.utils.network.search import NetworkLocationListener
 
         instance = build_broadcast_instance(self.port)
@@ -549,6 +552,7 @@ class LogPlugin(SimplePlugin):
         # which will reinitialize logging, and override
         # what we are doing here.
         self.queue_listener = setup_queue_logging()
+        self.bus.log_queue = self.queue_listener.queue
 
     def log(self, msg, level):
         logger.log(level, msg)
@@ -728,6 +732,7 @@ def stop():
 
 
 class BaseKolibriProcessBus(ProcessBus):
+
     extra_channels = ("SERVING", "ZIP_SERVING")
 
     def __init__(
@@ -1025,7 +1030,7 @@ def get_zip_port():
     return zip_port
 
 
-def get_status():  # noqa: C901
+def get_status():  # noqa: max-complexity=16
     """
     Tries to get the PID of a running server.
 
@@ -1072,6 +1077,7 @@ def get_status():  # noqa: C901
     check_url = "http://{}:{}{}status/".format("127.0.0.1", listen_port, prefix)
 
     if conf.OPTIONS["Server"]["CHERRYPY_START"]:
+
         try:
             # Timeout is 3 seconds, we don't want the status command to be slow
             # TODO: Using 127.0.0.1 is a hardcode default from Kolibri, it could

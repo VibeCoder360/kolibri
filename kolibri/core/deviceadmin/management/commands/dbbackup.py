@@ -3,14 +3,14 @@ import logging
 from django.core.management.base import BaseCommand
 
 import kolibri
-from kolibri.utils import server
-
 from ...utils import dbbackup
+from kolibri.utils import server
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
+
     output_transaction = True
 
     # @ReservedAssignment
@@ -32,6 +32,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+
         try:
             server.get_status()
             self.stderr.write(

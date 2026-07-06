@@ -12,6 +12,10 @@ from morango.models import HardDeletedModels
 from morango.models import Store
 from morango.sync.controller import MorangoProfileController
 
+from .. import models as auth_models
+from .helpers import setup_device
+from .test_api import ClassroomFactory
+from .test_api import LearnerGroupFactory
 from kolibri.core.auth.constants.morango_sync import PROFILE_FACILITY_DATA
 from kolibri.core.content import models as content_models
 from kolibri.core.device.models import DevicePermissions
@@ -23,11 +27,6 @@ from kolibri.core.logger.test.factory_logger import ContentSessionLogFactory
 from kolibri.core.logger.test.factory_logger import ContentSummaryLogFactory
 from kolibri.core.logger.test.factory_logger import FacilityUserFactory
 from kolibri.core.logger.test.factory_logger import UserSessionLogFactory
-
-from .. import models as auth_models
-from .helpers import setup_device
-from .test_api import ClassroomFactory
-from .test_api import LearnerGroupFactory
 
 MODELS_DELETED_BY_DEPROVISION = [
     AttemptLog,

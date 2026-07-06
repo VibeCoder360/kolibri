@@ -1,14 +1,9 @@
 /**
- * @file Prevent RTL-breaking inline styles in Vue components.
+ * @fileoverview Prevent RTL-breaking inline styles in Vue components
  * @author Learning Equality
  */
 
 const utils = require('eslint-plugin-vue/lib/utils');
-
-/**
- * @typedef {import('vue-eslint-parser').AST.VAttribute} VAttribute
- * @typedef {import('vue-eslint-parser').AST.VExpressionContainer} VExpressionContainer
- */
 
 // RTL-breaking CSS properties (kebab-case and camelCase variants)
 // Note: text-align, textAlign, float, and clear are NOT included here because
@@ -69,18 +64,18 @@ const RTL_BREAKING_PROPERTIES = new Set([
 const DIRECTIONAL_VALUES = new Set(['left', 'right']);
 
 /**
- * Check if a CSS property is RTL-breaking.
- * @param {string} property - CSS property name.
- * @returns {boolean} True if the property breaks RTL layout.
+ * Check if a CSS property is RTL-breaking
+ * @param {string} property - CSS property name
+ * @returns {boolean}
  */
 function isRtlBreakingProperty(property) {
   return RTL_BREAKING_PROPERTIES.has(property);
 }
 
 /**
- * Check if a value contains directional keywords.
- * @param {string} value - CSS value to check.
- * @returns {boolean} True if the value contains a directional keyword like 'left' or 'right'.
+ * Check if a value contains directional keywords
+ * @param {string} value - CSS value
+ * @returns {boolean}
  */
 function hasDirectionalValue(value) {
   if (typeof value !== 'string') {
@@ -99,9 +94,9 @@ function hasDirectionalValue(value) {
 }
 
 /**
- * Check if a conditional expression is RTL-aware (uses isRtl in the test).
- * @param {object} node - AST ConditionalExpression node.
- * @returns {boolean} True if the ternary condition references isRtl.
+ * Check if a conditional expression is RTL-aware (uses isRtl in the test)
+ * @param {ConditionalExpression} node - AST node
+ * @returns {boolean}
  */
 function isRtlAwareTernary(node) {
   if (!node || node.type !== 'ConditionalExpression') {
@@ -142,9 +137,9 @@ function isRtlAwareTernary(node) {
 }
 
 /**
- * Check if static style attribute contains RTL-breaking properties.
- * @param {string} styleValue - The value of the style attribute.
- * @returns {boolean} True if any RTL-breaking property is found in the style string.
+ * Check if static style attribute contains RTL-breaking properties
+ * @param {string} styleValue - The value of the style attribute
+ * @returns {boolean}
  */
 function hasRtlBreakingStaticStyle(styleValue) {
   if (!styleValue) {
@@ -180,9 +175,9 @@ function hasRtlBreakingStaticStyle(styleValue) {
 }
 
 /**
- * Extract string literal values from a ConditionalExpression (ternary).
- * @param {object} node - AST ConditionalExpression node.
- * @returns {Array<{value: string, node: object}>} String literals from the ternary branches.
+ * Extract string literal values from a ConditionalExpression (ternary)
+ * @param {ConditionalExpression} node - AST node
+ * @returns {Array<{value: string, node: Node}>}
  */
 function extractTernaryStringLiterals(node) {
   const results = [];
@@ -207,9 +202,9 @@ function extractTernaryStringLiterals(node) {
 }
 
 /**
- * Extract property names from an ObjectExpression node.
- * @param {object} node - AST ObjectExpression node.
- * @returns {Array<{property: string, node: object}>} RTL-breaking property names with their nodes.
+ * Extract property names from an ObjectExpression node
+ * @param {ObjectExpression} node - AST node
+ * @returns {Array<{property: string, node: Node}>}
  */
 function extractObjectProperties(node) {
   const properties = [];
@@ -271,9 +266,9 @@ function extractObjectProperties(node) {
 }
 
 /**
- * Recursively check expressions for RTL-breaking properties.
- * @param {object} node - AST node to check.
- * @returns {Array<{property: string, node: object}>} RTL-breaking property violations found.
+ * Recursively check expressions for RTL-breaking properties
+ * @param {Node} node - AST node
+ * @returns {Array<{property: string, node: Node}>}
  */
 function checkExpression(node) {
   if (!node) {
@@ -331,8 +326,8 @@ module.exports = {
   create(context) {
     return utils.defineTemplateBodyVisitor(context, {
       /**
-       * Check static style attributes: `<div style="margin-left: 8px">`.
-       * @param {VAttribute} node - VAttribute AST node for the style attribute.
+       * Check static style attributes: <div style="margin-left: 8px">
+       * @param {VAttribute} node
        */
       'VAttribute[directive=false][key.name="style"]'(node) {
         if (!node.value || !node.value.value) {
@@ -348,9 +343,8 @@ module.exports = {
       },
 
       /**
-       * Check dynamic style bindings: `<div :style="{marginLeft: '8px'}">`.
-       * @param {VExpressionContainer} node - VExpressionContainer AST node for the style
-       * binding.
+       * Check dynamic style bindings: <div :style="{ marginLeft: '8px' }">
+       * @param {VExpressionContainer} node
        */
       "VAttribute[directive=true][key.name.name='bind'][key.argument.name='style'] > VExpressionContainer.value"(
         node,

@@ -1,9 +1,8 @@
 """
 Single authoritative implementation of get_synthetic_content_id, shared between
 the learner-side logger API (kolibri.core.logger.api) and the coach-side unit
-report API (kolibri.plugins.coach.viewsets.unit_report).
+report API (kolibri.plugins.coach.unit_report_api).
 """
-
 import uuid
 
 _PRE_POST_TEST_SYNTHETIC_CONTENT_ID_NAMESPACE = uuid.UUID(

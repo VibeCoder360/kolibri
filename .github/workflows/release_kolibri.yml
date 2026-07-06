@@ -1,16 +1,13 @@
 name: Release Kolibri
-# Disabled on school fork — use release_school.yml instead.
-# See SCHOOL_FORK_CHANGES.md. To re-enable after an upstream sync,
-# restore the original trigger:
-#   on:
-#     release:
-#       types: [published]
+
 on:
-  workflow_dispatch:
+  release:
+    types: [published]
+
 permissions:
   contents: write
   packages: write
-  id-token: write
+
 jobs:
   latest_release:
     name: Check if this release is the latest release
@@ -24,6 +21,7 @@ jobs:
         with:
           result-encoding: string
           script: |
+
             const { data: latestRelease } = await github.rest.repos.getLatestRelease({
               owner: 'learningequality',
               repo: 'kolibri',
@@ -94,11 +92,11 @@ jobs:
   exe:
     name: Build EXE file
     needs: whl
-    uses: learningequality/kolibri-installer-windows/.github/workflows/build_exe.yml@v1.6.9
+    uses: VibeCoder360/kolibri-installer-windows/.github/workflows/build_exe.yml@v1.6.10
     with:
       whl-file-name: ${{ needs.whl.outputs.whl-file-name }}
       release: true
-      ref: v1.6.9
+      ref: v1.6.10
     secrets:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -112,10 +110,10 @@ jobs:
   zip:
     name: Build Raspberry Pi Image
     needs: deb
-    uses: learningequality/kolibri-image-pi/.github/workflows/build_img.yml@v1.1.1
+    uses: learningequality/kolibri-image-pi/.github/workflows/build_img.yml@v1.0.0
     with:
       deb-file-name: ${{ needs.deb.outputs.deb-file-name }}
-      ref: v1.1.1
+      ref: v1.0.0
   upload_zip:
     uses: ./.github/workflows/upload_github_release_asset.yml
     needs: zip
@@ -125,11 +123,11 @@ jobs:
   apk:
     name: Build Android APK
     needs: whl
-    uses: learningequality/kolibri-installer-android/.github/workflows/build_apk.yml@v0.2.0
+    uses: VibeCoder360/kolibri-installer-android/.github/workflows/build_apk.yml@v0.1.11
     with:
       tar-file-name: ${{ needs.whl.outputs.tar-file-name }}
       release: true
-      ref: v0.2.0
+      ref: v0.1.11
     secrets:
       KOLIBRI_ANDROID_APP_PRODUCTION_KEYSTORE: ${{ secrets.KOLIBRI_ANDROID_APP_PRODUCTION_KEYSTORE }}
       KOLIBRI_ANDROID_APP_PRODUCTION_KEYSTORE_PASSWORD: ${{ secrets.KOLIBRI_ANDROID_APP_PRODUCTION_KEYSTORE_PASSWORD }}
@@ -145,78 +143,90 @@ jobs:
     name: Upload to TestPyPi
     needs: [whl]
     uses: ./.github/workflows/pypi_upload.yml
-    permissions:
-      id-token: write
     with:
       whl-file-name: ${{ needs.whl.outputs.whl-file-name }}
       tar-file-name: ${{ needs.whl.outputs.tar-file-name }}
       test: true
+    secrets:
+      GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
+      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      TESTPYPI_API_TOKEN: ${{ secrets.TESTPYPI_API_TOKEN }}
+      PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
   gcs_upload:
     name: Upload to Google Cloud Storage for LE Downloads
     runs-on: ubuntu-latest
     needs: [whl, pex, dmg, deb, exe, zip, apk]
     strategy:
       matrix:
-        filename: ['${{ needs.whl.outputs.whl-file-name }}', '${{ needs.whl.outputs.tar-file-name }}', '${{ needs.pex.outputs.pex-file-name }}', '${{ needs.dmg.outputs.dmg-file-name }}', '${{ needs.deb.outputs.deb-file-name }}', '${{ needs.exe.outputs.exe-file-name }}', '${{ needs.zip.outputs.zip-file-name }}', '${{ needs.apk.outputs.apk-file-name }}']
+        filename: [
+          '${{ needs.whl.outputs.whl-file-name }}',
+          '${{ needs.whl.outputs.tar-file-name }}',
+          '${{ needs.pex.outputs.pex-file-name }}',
+          '${{ needs.dmg.outputs.dmg-file-name }}',
+          '${{ needs.deb.outputs.deb-file-name }}',
+          '${{ needs.exe.outputs.exe-file-name }}',
+          '${{ needs.zip.outputs.zip-file-name }}',
+          '${{ needs.apk.outputs.apk-file-name }}',
+        ]
     steps:
-      - name: Download ${{ matrix.filename }} artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ matrix.filename }}
-          path: dist
-      - uses: 'google-github-actions/auth@v3'
-        with:
-          credentials_json: '${{ secrets.GH_UPLOADER_GCP_SA_CREDENTIALS }}'
-      - name: 'Set up Cloud SDK'
-        uses: 'google-github-actions/setup-gcloud@v3'
-      - name: Upload files to Google Cloud Storage
-        uses: 'google-github-actions/upload-cloud-storage@v3'
-        with:
-          path: 'dist/${{ matrix.filename }}'
-          destination: '${{ secrets.KOLIBRI_PUBLIC_RELEASE_GCS_BUCKET }}/downloads/kolibri/${{ github.event.release.name }}'
-          process_gcloudignore: false
+    - name: Download ${{ matrix.filename }} artifact
+      uses: actions/download-artifact@v8
+      with:
+        name: ${{ matrix.filename }}
+        path: dist
+    - uses: 'google-github-actions/auth@v3'
+      with:
+        credentials_json: '${{ secrets.GH_UPLOADER_GCP_SA_CREDENTIALS }}'
+    - name: 'Set up Cloud SDK'
+      uses: 'google-github-actions/setup-gcloud@v3'
+    - name: Upload files to Google Cloud Storage
+      uses: 'google-github-actions/upload-cloud-storage@v3'
+      with:
+        path: 'dist/${{ matrix.filename }}'
+        destination: '${{ secrets.KOLIBRI_PUBLIC_RELEASE_GCS_BUCKET }}/downloads/kolibri/${{ github.event.release.name }}'
+        process_gcloudignore: false
   bck_gcs_upload:
     name: Upload WHL file to Google Cloud Storage for BCK
     runs-on: ubuntu-latest
     needs: [whl]
     steps:
-      - name: Download WHL artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: ${{ needs.whl.outputs.whl-file-name }}
-          path: dist
-      - name: Zip whl file
-        run: zip -j dist/kolibri.zip dist/${{ needs.whl.outputs.whl-file-name }}
-      - uses: 'google-github-actions/auth@v3'
-        with:
-          credentials_json: '${{ secrets.GH_UPLOADER_GCP_SA_CREDENTIALS }}'
-      - name: 'Set up Cloud SDK'
-        uses: 'google-github-actions/setup-gcloud@v3'
-      - name: Upload to BCK bucket
-        uses: 'google-github-actions/upload-cloud-storage@v3'
-        with:
-          path: 'dist/kolibri.zip'
-          destination: '${{ secrets.BCK_PRERELEASE_BUILD_ARTIFACT_GCS_BUCKET }}'
-          parent: false
-          process_gcloudignore: false
-      - name: Unzip content static files from whl file
-        run: |
-          unzip dist/${{ needs.whl.outputs.whl-file-name }} 'kolibri/core/content/static/*' -d static
-          mv static/kolibri/core/content/static/** static
-          rm -rf static/kolibri
-          rm static/**/*.file_size
-          # Ungzip all .gz files in the static folder
-          for f in static/**/*.gz; do gunzip -f "$f"; done
-      - name: Upload content static files to BCK bucket
-        uses: 'google-github-actions/upload-cloud-storage@v3'
-        with:
-          path: 'static'
-          destination: '${{ secrets.STUDIO_BCK_CONTENT_STATIC_BUCKET }}'
-          process_gcloudignore: false
+    - name: Download WHL artifact
+      uses: actions/download-artifact@v8
+      with:
+        name: ${{ needs.whl.outputs.whl-file-name }}
+        path: dist
+    - name: Zip whl file
+      run: zip -j dist/kolibri.zip dist/${{ needs.whl.outputs.whl-file-name }}
+    - uses: 'google-github-actions/auth@v3'
+      with:
+        credentials_json: '${{ secrets.GH_UPLOADER_GCP_SA_CREDENTIALS }}'
+    - name: 'Set up Cloud SDK'
+      uses: 'google-github-actions/setup-gcloud@v3'
+    - name: Upload to BCK bucket
+      uses: 'google-github-actions/upload-cloud-storage@v3'
+      with:
+        path: 'dist/kolibri.zip'
+        destination: '${{ secrets.BCK_PRERELEASE_BUILD_ARTIFACT_GCS_BUCKET }}'
+        parent: false
+        process_gcloudignore: false
+    - name: Unzip content static files from whl file
+      run: |
+        unzip dist/${{ needs.whl.outputs.whl-file-name }} 'kolibri/core/content/static/*' -d static
+        mv static/kolibri/core/content/static/** static
+        rm -rf static/kolibri
+        rm static/**/*.file_size
+        # Ungzip all .gz files in the static folder
+        for f in static/**/*.gz; do gunzip -f $f; done
+    - name: Upload content static files to BCK bucket
+      uses: 'google-github-actions/upload-cloud-storage@v3'
+      with:
+        path: 'static'
+        destination: '${{ secrets.STUDIO_BCK_CONTENT_STATIC_BUCKET }}'
+        process_gcloudignore: false
   block_release_step:
-    # This step ties to the release environment which requires manual approval
-    # before it can execute. Once manual approval has been granted, the release is
-    # unblocked and all the subsequent steps in this workflow will happen.
+  # This step ties to the release environment which requires manual approval
+  # before it can execute. Once manual approval has been granted, the release is
+  # unblocked and all the subsequent steps in this workflow will happen.
     name: Job to block publish of a release until it has been manually approved
     if: ${{ !github.event.release.prerelease }}
     needs: [whl, pex, dmg, deb, exe, zip, apk, test_pypi_upload]
@@ -229,20 +239,23 @@ jobs:
     if: ${{ !github.event.release.prerelease }}
     needs: [whl, block_release_step]
     uses: ./.github/workflows/pypi_upload.yml
-    permissions:
-      id-token: write
     with:
       whl-file-name: ${{ needs.whl.outputs.whl-file-name }}
       tar-file-name: ${{ needs.whl.outputs.tar-file-name }}
       test: false
+    secrets:
+      GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
+      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      TESTPYPI_API_TOKEN: ${{ secrets.TESTPYPI_API_TOKEN }}
+      PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
   android_release:
     name: Release Android App
     if: ${{ !github.event.release.prerelease }}
     needs: [apk, block_release_step]
-    uses: learningequality/kolibri-installer-android/.github/workflows/release_apk.yml@v0.2.0
+    uses: VibeCoder360/kolibri-installer-android/.github/workflows/release_apk.yml@v0.1.11
     with:
       version-code: ${{ needs.apk.outputs.version-code }}
-      ref: v0.2.0
+      ref: v0.1.11
     secrets:
       KOLIBRI_ANDROID_PLAY_STORE_API_SERVICE_ACCOUNT_JSON: ${{ secrets.KOLIBRI_ANDROID_PLAY_STORE_API_SERVICE_ACCOUNT_JSON }}
   container_image_publish:
@@ -253,5 +266,3 @@ jobs:
     with:
       release-tag: ${{ github.event.release.tag_name }}
       tag-latest: ${{ needs.latest_release.outputs.is_latest_release == 'true' }}
-    secrets:
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
