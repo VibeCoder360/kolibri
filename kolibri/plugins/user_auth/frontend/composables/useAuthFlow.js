@@ -73,7 +73,11 @@ const signInMethod = computed({
     ) {
       return _persistentSignInMethod.value;
     }
-    // Picture password sign-in is the default if enabled
+    // Face sign-in is the default when available (facility enabled + camera usable)
+    if (signInOptions.value.includes(OptionsForSignIn.FACE_LOGIN)) {
+      return OptionsForSignIn.FACE_LOGIN;
+    }
+    // Picture password sign-in is the next default if enabled
     if (signInOptions.value.includes(OptionsForSignIn.PICTURE_PASSWORD)) {
       return OptionsForSignIn.PICTURE_PASSWORD;
     }

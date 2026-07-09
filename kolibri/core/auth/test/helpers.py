@@ -105,6 +105,18 @@ def disable_qr_login(facility):
     dataset.save()
 
 
+def enable_face_login(facility):
+    dataset = facility.dataset
+    dataset.enable_face_login = True
+    dataset.save()
+
+
+def disable_face_login(facility):
+    dataset = facility.dataset
+    dataset.enable_face_login = False
+    dataset.save()
+
+
 def create_dummy_facility_data(
     allow_sign_ups=False, classroom_count=2, learnergroup_count=2
 ):

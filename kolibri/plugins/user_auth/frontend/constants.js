@@ -4,6 +4,7 @@ export const ComponentMap = {
   USERNAME_SIGN_IN: 'SignInPage',
   PICTURE_SIGN_IN: 'PictureSignInPage',
   QR_SIGN_IN: 'QRSignInPage',
+  FACE_SIGN_IN: 'FaceSignInPage',
   SIGN_UP: 'SignUpPage',
   AUTH_SELECT: 'AuthSelect',
   FACILITY_SELECT: 'FacilitySelect',
@@ -15,6 +16,7 @@ export const SignInOptionToComponentMap = {
   [OptionsForSignIn.USERNAME_PASSWORD]: ComponentMap.USERNAME_SIGN_IN,
   [OptionsForSignIn.PICTURE_PASSWORD]: ComponentMap.PICTURE_SIGN_IN,
   [OptionsForSignIn.QR_LOGIN]: ComponentMap.QR_SIGN_IN,
+  [OptionsForSignIn.FACE_LOGIN]: ComponentMap.FACE_SIGN_IN,
 };
 
 export const DeviceUnusableReason = {

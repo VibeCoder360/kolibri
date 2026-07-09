@@ -85,6 +85,20 @@
                 @click.stop="showQrLoginInfoModal = true"
               />
             </div>
+            <div class="checkbox-and-info-wrapper">
+              <KCheckbox
+                v-model="settings.enable_face_login"
+                :label="enableFaceLogin$()"
+                data-testid="enable_face_login"
+              />
+            </div>
+            <p
+              v-if="settings.enable_face_login"
+              class="face-login-info"
+              :style="{ color: $themeTokens.annotation }"
+            >
+              {{ enableFaceLoginDescription$() }}
+            </p>
             <template v-if="!isPictureLoginFeatureEnabled">
               <KCheckbox
                 :checked="signInOption === OptionsForSignIn.USERNAME_PASSWORD"
@@ -381,6 +395,7 @@
   import { pageLoading } from 'kolibri-common/composables/usePageLoading';
   import { picturePasswordStrings } from 'kolibri-common/strings/picturePasswords';
   import { qrLoginStrings } from 'kolibri-common/strings/qrLoginStrings';
+  import { faceLoginStrings } from 'kolibri-common/strings/faceLoginStrings';
 
   import { OptionsForSignIn, PicturePasswordIconStyle } from 'kolibri-common/constants/Auth';
   import useFacilityEditor from '../../composables/useFacilityEditor';
@@ -486,6 +501,7 @@
         generatingQrCodes$,
         qrLoginInfoTitle$,
       } = qrLoginStrings;
+      const { enableFaceLogin$, enableFaceLoginDescription$ } = faceLoginStrings;
 
       // state
       const showEditFacilityModal = ref(false);
@@ -717,6 +733,8 @@
         enableQrLogin$,
         qrLoginInfoTitle$,
         generatingQrCodes$,
+        enableFaceLogin$,
+        enableFaceLoginDescription$,
         learnerCanEditPassword$,
         learnerNeedPasswordToLogin$,
         showDownloadButtonInLearn$,
@@ -822,6 +840,14 @@
     display: flex;
     align-items: center;
     margin-bottom: 2rem;
+  }
+
+  .face-login-info {
+    margin-top: -1.5rem;
+    margin-bottom: 2rem;
+    margin-inline-start: 32px;
+    font-size: 12px;
+    line-height: normal;
   }
 
   .radio-description {

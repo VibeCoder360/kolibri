@@ -16,6 +16,10 @@ from kolibri.core.auth.models import Facility
 from kolibri.core.auth.models import FacilityUser
 from kolibri.core.auth.models import Role
 from kolibri.core.auth.models import Session
+from kolibri.core.auth.utils.face_embeddings import CURRENT_EMBEDDING_VERSION
+from kolibri.core.auth.utils.face_embeddings import decode_embedding
+from kolibri.core.auth.utils.face_embeddings import find_best_face_match
+from kolibri.core.auth.utils.face_embeddings import get_face_login_thresholds
 from kolibri.core.device.utils import is_full_facility_import
 
 
@@ -225,6 +229,78 @@ class QRTokenAuthScope(FacilityAuthScope):
         return user.dataset.enable_qr_login
 
 
+class FaceAuthScope(FacilityAuthScope):
+    """Auth scope for face-recognition (embedding) authentication"""
+
+    def __init__(self, facility_or_id, face_embedding=None):
+        super().__init__(facility_or_id)
+        self.face_embedding = face_embedding
+
+    def get_queryset(self):
+        # Filtering on enable_face_login here short-circuits the (relatively
+        # expensive) gallery scan when the facility has face login disabled;
+        # matches_credentials re-checks the flag for defense-in-depth,
+        # consistent with the other scopes.
+        return (
+            super()
+            .get_queryset()
+            .filter(face_data__isnull=False, dataset__enable_face_login=True)
+            .select_related("face_data")
+        )
+
+    def _decode_user_samples(self, user):
+        """
+        Decode a user's stored enrollment samples, returning [] for any user
+        whose face data is malformed or from an incompatible descriptor model
+        version — those users are simply not comparable to the probe.
+        """
+        face_data = user.face_data
+        if face_data.embedding_version != CURRENT_EMBEDDING_VERSION:
+            return []
+        if not isinstance(face_data.embeddings, list):
+            return []
+        try:
+            return [decode_embedding(sample) for sample in face_data.embeddings]
+        except ValueError:
+            return []
+
+    def iter_candidate_users(self):
+        """
+        Face matching is 1:N best-match, not first-match: we rank every
+        enrolled user in the facility by their nearest sample distance to the
+        probe and yield at most ONE user — the closest — and only when the
+        match is both close enough (THRESHOLD) and unambiguous (MARGIN to the
+        runner-up user). Yielding a single candidate keeps the generic
+        first-match loop in FacilityUserBackend._run correct for this scope.
+        """
+        try:
+            probe = decode_embedding(self.face_embedding)
+        except ValueError:
+            return
+
+        candidates = []
+        for user in self.get_queryset():
+            samples = self._decode_user_samples(user)
+            if samples:
+                candidates.append((user, samples))
+
+        match = find_best_face_match(probe, candidates)
+        if match is None:
+            return
+        user, best_distance, runner_up_distance = match
+        threshold, margin = get_face_login_thresholds()
+        if best_distance < threshold and runner_up_distance - best_distance > margin:
+            yield user
+
+    def matches_credentials(self, user):
+        """
+        Validates that the user's facility has face login enabled. Like QR
+        tokens, face login is not learner-only: any enrolled user may sign in
+        with it, and enrollment itself is explicit opt-in.
+        """
+        return user.dataset.enable_face_login
+
+
 class FacilityUserBackend:
     """
     A class that implements authentication for FacilityUsers.
@@ -241,11 +317,13 @@ class FacilityUserBackend:
         :keyword facility: a Facility object or facility pk
         :keyword picture_password: a dot-separated picture sequence string
         :keyword qr_login_token: a QR code login token string
+        :keyword face_embedding: a base64-encoded face embedding string
         :return: A FacilityUser instance if successful, or None if authentication failed.
         """
         facility = kwargs.get(FACILITY_CREDENTIAL_KEY, None)
         picture_password = kwargs.get("picture_password", None)
         qr_login_token = kwargs.get("qr_login_token", None)
+        face_embedding = kwargs.get("face_embedding", None)
 
         scopes = []
 
@@ -264,6 +342,13 @@ class FacilityUserBackend:
             if not facility:
                 raise PermissionDenied("Invalid credentials")
             scopes.append(QRTokenAuthScope(facility, qr_login_token))
+        elif face_embedding is not None:
+            # Face authentication path. Same isolation rule as the other
+            # alternative credentials: a failed face attempt must never fall
+            # through to username/password.
+            if not facility:
+                raise PermissionDenied("Invalid credentials")
+            scopes.append(FaceAuthScope(facility, face_embedding))
         else:
             if facility:
                 scopes.append(BasicUserAuthScope(facility, username, password))

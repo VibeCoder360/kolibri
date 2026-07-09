@@ -118,6 +118,11 @@ export default function useAuthRouter(route) {
   /**
    * @type {import('vue').ComputedRef<object>}
    */
+  const faceSignInRoute = computed(() => getSignInRoute(ComponentMap.FACE_SIGN_IN));
+
+  /**
+   * @type {import('vue').ComputedRef<object>}
+   */
   const signUpRoute = computed(() => getSignInRoute(ComponentMap.SIGN_UP));
 
   return {
@@ -130,6 +135,7 @@ export default function useAuthRouter(route) {
     pictureSignInRoute,
     usernameSignInRoute,
     qrSignInRoute,
+    faceSignInRoute,
     signUpRoute,
     getFacilitySelectionRoute,
     getSignInRoute,

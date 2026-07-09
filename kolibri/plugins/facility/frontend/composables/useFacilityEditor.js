@@ -47,7 +47,15 @@ export default function useFacilityEditor() {
       if (signInOptions.value.includes(OptionsForSignIn.PICTURE_PASSWORD)) {
         return OptionsForSignIn.PICTURE_PASSWORD;
       }
-      return signInOptions.value[0];
+      // The radio group only offers picture-password and the username-based
+      // methods. QR and face login are additive checkboxes (and sort before
+      // username in signInOptions), so returning signInOptions[0] here would
+      // yield a value no radio matches — leaving the group blank and
+      // mis-rendering the password checkboxes. Always resolve to the
+      // username-based option.
+      return signInOptions.value.find(option =>
+        [OptionsForSignIn.USERNAME_PASSWORD, OptionsForSignIn.USERNAME_ONLY].includes(option),
+      );
     },
     set(value) {
       modifySignInOption(value);
@@ -163,6 +171,7 @@ export default function useFacilityEditor() {
     'learner_can_login_with_no_password',
     'learner_can_edit_password',
     'enable_qr_login',
+    'enable_face_login',
   ];
 
   async function saveFacilityConfig() {

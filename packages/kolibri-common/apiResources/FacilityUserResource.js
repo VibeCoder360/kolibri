@@ -29,6 +29,19 @@ export default new Resource({
       data: { user_ids },
     });
   },
+  enrollFace(user_id, embeddings, consent_acknowledged, embedding_version) {
+    return client({
+      url: urls['kolibri:core:facilityuser_enroll_face'](user_id),
+      method: 'POST',
+      data: { embeddings, consent_acknowledged, embedding_version },
+    });
+  },
+  clearFace(user_id) {
+    return client({
+      url: urls['kolibri:core:facilityuser_clear_face'](user_id),
+      method: 'POST',
+    });
+  },
   async listRemoteFacilityLearners(params) {
     const { data } = await client({
       url: urls['kolibri:core:remotefacilityauthenticateduserinfo'](),

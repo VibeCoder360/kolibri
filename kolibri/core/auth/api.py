@@ -16,6 +16,7 @@ from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import transaction
+from django.db.models import Exists
 from django.db.models import Func
 from django.db.models import OuterRef
 from django.db.models import Q
@@ -65,6 +66,7 @@ from .models import Collection
 from .models import Facility
 from .models import FacilityDataset
 from .models import FacilityUser
+from .models import FacilityUserFaceData
 from .models import LearnerGroup
 from .models import Membership
 from .models import Role
@@ -91,6 +93,8 @@ from kolibri.core.auth.tasks import assign_picture_passwords_to_facility
 from kolibri.core.auth.tasks import assign_qr_login_tokens_to_facility
 from kolibri.core.auth.tasks import cleanup_expired_deleted_users
 from kolibri.core.auth.utils.delete import delete_imported_user
+from kolibri.core.auth.utils.face_embeddings import CURRENT_EMBEDDING_VERSION
+from kolibri.core.auth.utils.face_embeddings import validate_embedding_samples
 from kolibri.core.auth.utils.picture_passwords import are_picture_passwords_exhausted
 from kolibri.core.auth.utils.picture_passwords import get_learner_count
 from kolibri.core.auth.utils.qr_tokens import assign_qr_login_token
@@ -117,6 +121,7 @@ from kolibri.core.tasks.main import job_storage
 from kolibri.core.utils.pagination import ValuesViewsetPageNumberPagination
 from kolibri.core.utils.token_generator import TokenGenerator
 from kolibri.core.utils.urls import reverse_path
+from kolibri.utils.time_utils import local_now
 
 logger = logging.getLogger(__name__)
 
@@ -245,6 +250,7 @@ class FacilityDatasetViewSet(ValuesViewset):
         "show_download_button_in_learn",
         "enable_mark_attendance",
         "enable_qr_login",
+        "enable_face_login",
         "extra_fields",
         "picture_password_settings",
         "description",
@@ -311,6 +317,23 @@ class FacilityDatasetViewSet(ValuesViewset):
         )
         learner_can_edit_password = request.data.get("learner_can_edit_password")
         new_enable_qr_login = request.data.get("enable_qr_login")
+        new_enable_face_login = request.data.get("enable_face_login")
+
+        # Face login toggling. Unlike QR, there is nothing to bulk-assign:
+        # users enroll individually (with consent), so this just flips the
+        # flag. Disabling leaves existing enrollments intact so re-enabling
+        # later is cheap; deleting enrollment data is an explicit per-user
+        # action (clear_face).
+        if (
+            new_enable_face_login is not None
+            and bool(new_enable_face_login) != dataset.enable_face_login
+        ):
+            dataset.enable_face_login = bool(new_enable_face_login)
+            dataset.save()
+            return Response(
+                {"dataset": FacilityDatasetSerializer(dataset).data},
+                status=status.HTTP_200_OK,
+            )
 
         # QR login enabling. When flipping from disabled to enabled, enqueue
         # the bulk-assignment task so all existing eligible learners receive a
@@ -717,7 +740,9 @@ class FacilityUserViewSet(FacilityUserConsolidateMixin, ValuesViewset, BulkDelet
     # create, update). ``profile_image`` can be up to ~150 KB of base64 per
     # user, so returning it for every member of a large facility would bloat
     # the roster response by tens of megabytes on every page load.
-    detail_only_values = ("profile_image",)
+    # ``face_enrolled`` is only needed by the per-user profile view, so it is
+    # kept off the roster to avoid changing the (widely asserted) list shape.
+    detail_only_values = ("profile_image", "face_enrolled")
 
     ordering_fields = (
         "id",
@@ -732,6 +757,16 @@ class FacilityUserViewSet(FacilityUserConsolidateMixin, ValuesViewset, BulkDelet
     field_map = {
         "is_superuser": lambda x: bool(x.pop("devicepermissions__is_superuser"))
     }
+
+    def annotate_queryset(self, queryset):
+        # Expose whether the user has face-login enrollment (compute, don't
+        # store): the actual embeddings live in the device-local
+        # FacilityUserFaceData model and are never serialized.
+        return queryset.annotate(
+            face_enrolled=Exists(
+                FacilityUserFaceData.objects.filter(user_id=OuterRef("id"))
+            )
+        )
 
     def serialize_object(self, **filter_kwargs):
         original_values = self._values
@@ -850,6 +885,80 @@ class FacilityUserViewSet(FacilityUserConsolidateMixin, ValuesViewset, BulkDelet
             },
             status=status.HTTP_202_ACCEPTED,
         )
+
+    @decorators.action(
+        detail=True, methods=["post"], permission_classes=[IsAuthenticated]
+    )
+    def enroll_face(self, request, pk):
+        """
+        Enroll (or re-enroll, replacing all previous samples) a user for face
+        login. Expects an ``embeddings`` list of base64 float32 vectors
+        computed in the browser — no face image is ever sent or stored —
+        ``consent_acknowledged: true`` confirming the consent requirement
+        (parental consent for minors) has been met, and ``embedding_version``
+        identifying the browser descriptor model that produced the vectors.
+        Facility admins can enroll any user in their facility; any user can
+        enroll themselves.
+        """
+        user = get_object_or_404(FacilityUser, pk=pk)
+        if not (
+            request.user == user
+            or request.user.is_superuser
+            or request.user.has_role_for_collection(role_kinds.ADMIN, user.facility)
+        ):
+            raise PermissionDenied(
+                "Only facility admins can enroll other users for face login."
+            )
+        # Don't capture biometric data for a facility that has the feature off.
+        if not user.dataset.enable_face_login:
+            raise RestValidationError("Face login is not enabled for this facility.")
+        if not request.data.get("consent_acknowledged"):
+            raise RestValidationError(
+                "Consent must be acknowledged before enrolling a face."
+            )
+        # Reject embeddings from a stale client bundle whose descriptor model
+        # differs from the server's current version — storing them under the
+        # current version would poison the gallery with mislabeled vectors.
+        if request.data.get("embedding_version") != CURRENT_EMBEDDING_VERSION:
+            raise RestValidationError(
+                "Outdated face recognition model; please reload and try again."
+            )
+        embeddings = request.data.get("embeddings")
+        try:
+            validate_embedding_samples(embeddings)
+        except ValueError as e:
+            raise RestValidationError(str(e))
+        FacilityUserFaceData.objects.update_or_create(
+            user=user,
+            defaults={
+                "embeddings": embeddings,
+                "embedding_version": CURRENT_EMBEDDING_VERSION,
+                "consent_acknowledged": True,
+                "enrolled_at": local_now(),
+            },
+        )
+        return Response({"enrolled": True, "samples": len(embeddings)})
+
+    @decorators.action(
+        detail=True, methods=["post"], permission_classes=[IsAuthenticated]
+    )
+    def clear_face(self, request, pk):
+        """
+        Remove a user's face login enrollment, deleting their stored
+        embeddings. Facility admins can clear any user in their facility; any
+        user can clear their own.
+        """
+        user = get_object_or_404(FacilityUser, pk=pk)
+        if not (
+            request.user == user
+            or request.user.is_superuser
+            or request.user.has_role_for_collection(role_kinds.ADMIN, user.facility)
+        ):
+            raise PermissionDenied(
+                "Only facility admins can remove other users' face login enrollment."
+            )
+        FacilityUserFaceData.objects.filter(user=user).delete()
+        return Response({"enrolled": False})
 
 
 class DeletedFacilityUserViewSet(
@@ -1470,6 +1579,18 @@ class CreateSessionSerializer(serializers.Serializer):
         min_length=16,
         max_length=64,
     )
+    face_embedding = serializers.CharField(
+        required=False,
+        default=None,
+        allow_null=True,
+        allow_blank=False,
+        # Base64 of a little-endian float32 vector; a 1024-dimension
+        # descriptor encodes to ~5.5k chars. These bounds are a fast
+        # pre-check; decode_embedding (via the auth backend) is the
+        # authoritative format and dimension validator.
+        min_length=8,
+        max_length=16384,
+    )
 
     def validate(self, attrs):
         username = attrs.get("username")
@@ -1479,6 +1600,7 @@ class CreateSessionSerializer(serializers.Serializer):
         auth_token = attrs.get("auth_token")
         picture_password = attrs.get("picture_password")
         qr_login_token = attrs.get("qr_login_token")
+        face_embedding = attrs.get("face_embedding")
 
         request = self.context.get("request")
 
@@ -1511,12 +1633,40 @@ class CreateSessionSerializer(serializers.Serializer):
                 request, qr_login_token=qr_login_token, facility=facility
             )
 
+        # Face authentication. Same isolation rule as the other alternative
+        # credentials: if a face_embedding was supplied we never fall through
+        # to username/password auth, even on failure.
+        if (
+            user is None
+            and face_embedding is not None
+            and picture_password is None
+            and qr_login_token is None
+        ):
+            user = authenticate(
+                request, face_embedding=face_embedding, facility=facility
+            )
+            # Audit trail for a biometric login method (F8). We log the
+            # outcome only — never the embedding itself.
+            logger.info(
+                "Face login %s for facility %s%s",
+                "matched user {}".format(user.id) if user else "did not match",
+                getattr(facility, "id", facility),
+                " (prevalidate)"
+                if request and request.query_params.get("prevalidate") == "true"
+                else "",
+            )
+
         # username/password authentication — intentionally skipped when
-        # picture_password or qr_login_token was supplied (even if that auth
-        # failed), so a failed alternative-credential attempt cannot fall
-        # through to a username/password login with whatever credentials were
-        # also sent.
-        if user is None and picture_password is None and qr_login_token is None:
+        # picture_password, qr_login_token, or face_embedding was supplied
+        # (even if that auth failed), so a failed alternative-credential
+        # attempt cannot fall through to a username/password login with
+        # whatever credentials were also sent.
+        if (
+            user is None
+            and picture_password is None
+            and qr_login_token is None
+            and face_embedding is None
+        ):
             user = authenticate(
                 request, username=username, password=password, facility=facility
             )
@@ -1527,7 +1677,12 @@ class CreateSessionSerializer(serializers.Serializer):
 
         # Otherwise, throw a meaningful validation error
         self._throw_validation_error(
-            username, password, facility, picture_password, qr_login_token
+            username,
+            password,
+            facility,
+            picture_password,
+            qr_login_token,
+            face_embedding,
         )
 
     def _check_os_user(self, request, username):
@@ -1547,11 +1702,26 @@ class CreateSessionSerializer(serializers.Serializer):
         facility,
         picture_password=None,
         qr_login_token=None,
+        face_embedding=None,
     ):
         """
         Throw a RestValidationError with a helpful error message
         depending on what went wrong with authentication.
         """
+        if face_embedding is not None:
+            raise RestValidationError(
+                detail={
+                    "face_embedding": [
+                        {
+                            "id": error_constants.NOT_FOUND,
+                            "metadata": {
+                                "field": "face_embedding",
+                                "message": "No user found matching that face.",
+                            },
+                        }
+                    ]
+                }
+            )
         if picture_password is not None:
             raise RestValidationError(
                 detail={

@@ -4,6 +4,7 @@ import { currentLanguage } from 'kolibri/utils/i18n';
 import useUser from 'kolibri/composables/useUser';
 import FacilityDatasetResource from 'kolibri-common/apiResources/FacilityDatasetResource';
 import { OptionsForSignIn } from '../constants/Auth';
+import cameraSupported from '../utils/cameraSupported';
 import useFacilities from './useFacilities';
 
 /**
@@ -60,6 +61,12 @@ export function useFacilityConfig(facilityId) {
   // computed
   const signInOptions = computed(() => {
     const options = [];
+    // Face login is offered (and is the preferred default) only when the
+    // facility enables it AND this browser can use the camera (secure
+    // context) — checking here makes the no-camera fallback automatic.
+    if (facilityConfig.value.enable_face_login && cameraSupported()) {
+      options.push(OptionsForSignIn.FACE_LOGIN);
+    }
     // If not null, then we have picture password settings
     if (facilityConfig.value.picture_password_settings) {
       options.push(OptionsForSignIn.PICTURE_PASSWORD);

@@ -233,6 +233,7 @@ class FacilityDataset(FacilityDataSyncableModel):
     show_download_button_in_learn = models.BooleanField(default=True)
     enable_mark_attendance = models.BooleanField(default=False)
     enable_qr_login = models.BooleanField(default=True)
+    enable_face_login = models.BooleanField(default=False)
     picture_password_settings = JSONField(
         null=True,
         blank=True,
@@ -1199,6 +1200,11 @@ class FacilityUser(AbstractBaseUser, KolibriBaseUserMixin, AbstractFacilityDataM
         # reliably track changes - just clean up whenever date_deleted is set)
         if self.date_deleted is not None and self.pk is not None:
             Session.delete_all_sessions([self.id])
+            # Purge biometric face data promptly on soft delete rather than
+            # letting it linger until the hard-delete cleanup task runs — the
+            # same privacy reasoning that keeps this data device-local argues
+            # for not retaining it for a deleted (often minor) user.
+            FacilityUserFaceData.objects.filter(user_id=self.id).delete()
 
         return result
 
@@ -1225,6 +1231,36 @@ class FacilityUser(AbstractBaseUser, KolibriBaseUserMixin, AbstractFacilityDataM
         # ensure the superuser has full access to the Django admin
         if self.is_superuser:
             return True
+
+
+class FacilityUserFaceData(models.Model):
+    """
+    Device-local face-recognition enrollment data for a ``FacilityUser``.
+
+    Deliberately a plain Django model, NOT a morango ``SyncableModel``:
+    biometric templates of (mostly minor) users must stay on the device where
+    they were enrolled, and must never propagate to other servers or the Data
+    Portal via sync. Face login therefore only works against the server the
+    user enrolled on.
+
+    Embeddings are computed in the browser and stored as a list of base64
+    float32 strings (see ``kolibri.core.auth.utils.face_embeddings``); no face
+    image is ever retained.
+    """
+
+    user = models.OneToOneField(
+        "FacilityUser", on_delete=models.CASCADE, related_name="face_data"
+    )
+    # A list of base64-encoded float32 embeddings (multiple enrollment
+    # samples per user reduce false rejects from pose/lighting variation).
+    embeddings = JSONField(default=list)
+    # The browser-side descriptor model version these embeddings were
+    # computed with; embeddings from other versions are ignored at match time.
+    embedding_version = models.IntegerField(default=1)
+    # Whether the enrolling user acknowledged the consent requirement
+    # (parental consent for minors) at enrollment time.
+    consent_acknowledged = models.BooleanField(default=False)
+    enrolled_at = DateTimeTzField(default=local_now)
 
 
 class Collection(AbstractFacilityDataModel):

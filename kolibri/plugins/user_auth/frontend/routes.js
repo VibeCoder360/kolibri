@@ -7,24 +7,38 @@ import FacilitySelect from './views/FacilitySelect';
 import SignInPage from './views/SignInPage';
 import PictureSignInPage from './views/SignInPage/PictureSignInPage.vue';
 import QRSignInPage from './views/SignInPage/QRSignInPage.vue';
+import FaceSignInPage from './views/SignInPage/FaceSignInPage.vue';
 import SignUpPage from './views/SignUpPage';
 import NewPasswordPage from './views/SignInPage/NewPasswordPage';
 import useAuthFlow from './composables/useAuthFlow';
 import useAuthRouter from './composables/useAuthRouter';
 
-const { facilityId, signInMethod, canSignUpWithFacility } = useAuthFlow();
+const { facilityId, signInMethod, signInOptions, canSignUpWithFacility } = useAuthFlow();
+
+// Methods that require a camera + facility opt-in and are therefore not always
+// available; direct navigation to their route must be guarded.
+const CAMERA_SIGN_IN_METHODS = [OptionsForSignIn.QR_LOGIN, OptionsForSignIn.FACE_LOGIN];
 
 async function signInHook(method, to, from, next) {
-  const { getFacilitySelectionRoute } = useAuthRouter(to);
+  const { getFacilitySelectionRoute, defaultRoute } = useAuthRouter(to);
 
-  // Persist the sign-in method according to the route
-  if (signInMethod.value !== method) {
-    signInMethod.value = method;
-  }
   // If no facility has been selected, take user to facility selection
   if (!facilityId.value) {
     next(getFacilitySelectionRoute(false));
     return;
+  }
+  // Guard direct navigation (e.g. a bookmark) to a camera-based method that
+  // isn't available for this facility — the facility disabled it, or the
+  // device has no usable camera. The page's own guards are watchers that only
+  // fire on change, so without this a disabled scanner would render. Facility
+  // config is loaded by initializeFlow (global beforeEach) before this runs.
+  if (CAMERA_SIGN_IN_METHODS.includes(method) && !signInOptions.value.includes(method)) {
+    next(defaultRoute.value);
+    return;
+  }
+  // Persist the sign-in method according to the route
+  if (signInMethod.value !== method) {
+    signInMethod.value = method;
   }
   await showInactivitySnackbar();
   next();
@@ -58,6 +72,13 @@ export default [
     component: QRSignInPage,
     async beforeEnter(to, from, next) {
       await signInHook(OptionsForSignIn.QR_LOGIN, to, from, next);
+    },
+  },
+  {
+    path: '/face-signin',
+    component: FaceSignInPage,
+    async beforeEnter(to, from, next) {
+      await signInHook(OptionsForSignIn.FACE_LOGIN, to, from, next);
     },
   },
   {

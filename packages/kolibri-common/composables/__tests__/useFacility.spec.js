@@ -4,14 +4,20 @@ import FacilityDatasetResource from 'kolibri-common/apiResources/FacilityDataset
 import useUser, { useUserMock } from 'kolibri/composables/useUser';
 // eslint-disable-next-line import-x/named
 import useFacilities, { useFacilitiesMock } from '../useFacilities';
+import cameraSupported from '../../utils/cameraSupported';
 import { OptionsForSignIn } from '../../constants/Auth';
 
 jest.mock('kolibri-common/apiResources/FacilityDatasetResource');
 jest.mock('kolibri/composables/useUser');
 jest.mock('../useFacilities');
+jest.mock('../../utils/cameraSupported');
 jest.mock('kolibri/utils/i18n', () => ({
   currentLanguage: 'en',
 }));
+
+// Default: assume the camera is usable so face-login gating tests opt in/out
+// explicitly.
+cameraSupported.mockReturnValue(true);
 
 function loadUseFacilityModule() {
   let module;
@@ -401,6 +407,30 @@ describe('useFacilityConfig', () => {
       const { fetchFacilityConfig, signInOptions } = useFacilityConfig('facility-1');
       await fetchFacilityConfig();
       expect(signInOptions.value).toContain(OptionsForSignIn.USERNAME_PASSWORD);
+    });
+
+    it('includes FACE_LOGIN when enable_face_login is set and the camera is supported', async () => {
+      cameraSupported.mockReturnValue(true);
+      FacilityDatasetResource.fetchCollection.mockResolvedValue([
+        { ...mockFacilityConfig, enable_face_login: true },
+      ]);
+
+      const { useFacilityConfig } = loadUseFacilityModule();
+      const { fetchFacilityConfig, signInOptions } = useFacilityConfig('facility-1');
+      await fetchFacilityConfig();
+      expect(signInOptions.value).toContain(OptionsForSignIn.FACE_LOGIN);
+    });
+
+    it('omits FACE_LOGIN when the camera is not supported (automatic fallback)', async () => {
+      cameraSupported.mockReturnValue(false);
+      FacilityDatasetResource.fetchCollection.mockResolvedValue([
+        { ...mockFacilityConfig, enable_face_login: true },
+      ]);
+
+      const { useFacilityConfig } = loadUseFacilityModule();
+      const { fetchFacilityConfig, signInOptions } = useFacilityConfig('facility-1');
+      await fetchFacilityConfig();
+      expect(signInOptions.value).not.toContain(OptionsForSignIn.FACE_LOGIN);
     });
   });
 

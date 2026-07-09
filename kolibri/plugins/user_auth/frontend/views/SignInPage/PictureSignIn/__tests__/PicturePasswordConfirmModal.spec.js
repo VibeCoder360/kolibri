@@ -1,14 +1,9 @@
-import { ref, nextTick } from 'vue';
+import { nextTick } from 'vue';
 import { render, screen } from '@testing-library/vue';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
-import { useWindowSize } from '@vueuse/core';
 import { picturePasswordStrings } from 'kolibri-common/strings/picturePasswords';
 import PicturePasswordConfirmModal from '../PicturePasswordConfirmModal.vue';
-
-jest.mock('@vueuse/core', () => ({
-  useWindowSize: jest.fn(),
-}));
 
 jest.mock('kolibri-common/composables/useReturnFocusOnUnmount', () => ({
   __esModule: true,
@@ -20,12 +15,20 @@ const defaultProps = {
   picturePassword: '1.2.3',
 };
 
+const originalInnerHeight = window.innerHeight;
+
+// The component reads window.innerHeight at setup() and tracks it via a resize
+// listener; drive the viewport height by setting it before render.
 function renderComponent(props = {}, windowHeight = 800) {
-  useWindowSize.mockReturnValue({ height: ref(windowHeight) });
+  window.innerHeight = windowHeight;
   return render(PicturePasswordConfirmModal, { props: { ...defaultProps, ...props } });
 }
 
 describe('PicturePasswordConfirmModal', () => {
+  afterEach(() => {
+    window.innerHeight = originalInnerHeight;
+  });
+
   describe('rendering', () => {
     it('displays the learner name', () => {
       renderComponent();

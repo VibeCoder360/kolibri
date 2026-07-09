@@ -151,6 +151,18 @@
             </td>
           </tr>
 
+          <tr v-if="showFaceLoginRow">
+            <th>{{ faceSignInTitle$() }}</th>
+            <td>
+              <KButton
+                appearance="basic-link"
+                data-testid="face-enroll-button"
+                :text="faceEnrolled ? removeFaceSignIn$() : setUpFaceSignIn$()"
+                @click="showFaceModal = true"
+              />
+            </td>
+          </tr>
+
           <tr v-if="!isLearnerOnlyImport && canEditPassword">
             <th>{{ coreString('passwordLabel') }}</th>
             <td>
@@ -207,6 +219,14 @@
           @cancel="showPasswordModal = false"
         />
 
+        <FaceEnrollment
+          v-if="showFaceModal"
+          :userId="currentUser.id"
+          :alreadyEnrolled="faceEnrolled"
+          @success="handleFaceEnrollmentSuccess"
+          @cancel="showFaceModal = false"
+        />
+
         <KModal
           v-if="showLearnModal"
           :title="coreString('changeLearningFacility')"
@@ -246,6 +266,9 @@
   import useSnackbar from 'kolibri/composables/useSnackbar';
   import FacilityUserResource from 'kolibri-common/apiResources/FacilityUserResource';
   import { qrLoginStrings } from 'kolibri-common/strings/qrLoginStrings';
+  import { faceLoginStrings } from 'kolibri-common/strings/faceLoginStrings';
+  import cameraSupported from 'kolibri-common/utils/cameraSupported';
+  import FaceEnrollment from 'kolibri-common/components/FaceEnrollment';
   import { pageLoading } from 'kolibri-common/composables/usePageLoading';
   import { RoutesMap } from '../../constants';
   import useCurrentUser from '../../composables/useCurrentUser';
@@ -263,6 +286,7 @@
       AppBarPage,
       BirthYearDisplayText,
       ChangeUserPasswordModal,
+      FaceEnrollment,
       NotificationsRoot,
       GenderDisplayText,
       PermissionsIcon,
@@ -274,6 +298,7 @@
     setup() {
       const showPasswordModal = ref(false);
       const showLearnModal = ref(false);
+      const showFaceModal = ref(false);
       const { currentUser } = useCurrentUser();
       const {
         isLearnerOnlyImport,
@@ -292,6 +317,28 @@
       const userPermissions = computed(() => pickBy(_userPermissions.value));
       const { createSnackbar } = useSnackbar();
       const { myQRCode$, generateQrCode$, qrTokenOperationFailed$ } = qrLoginStrings;
+      const { faceSignInTitle$, setUpFaceSignIn$, removeFaceSignIn$ } = faceLoginStrings;
+
+      // Face-login enrollment state. Initialised from the API's computed
+      // `face_enrolled` flag and overridden locally after enroll/remove so the
+      // row updates without a full refetch.
+      const faceEnrolledOverride = ref(null);
+      const faceEnrolled = computed(() => {
+        if (faceEnrolledOverride.value !== null) {
+          return faceEnrolledOverride.value;
+        }
+        return Boolean(currentUser.value?.face_enrolled);
+      });
+      const showFaceLoginRow = computed(() => {
+        return Boolean(facilityConfig.value?.enable_face_login) && cameraSupported();
+      });
+
+      function handleFaceEnrollmentSuccess() {
+        // We only know it's now enrolled if we were setting up; a remove flips
+        // it off.
+        faceEnrolledOverride.value = !faceEnrolled.value;
+        showFaceModal.value = false;
+      }
 
       // Any user (including coaches, admins, and super admins) can generate a
       // QR login token for themselves. Learners usually already have one
@@ -332,6 +379,10 @@
         userFacilityId,
         showLearnModal,
         showPasswordModal,
+        showFaceModal,
+        faceEnrolled,
+        showFaceLoginRow,
+        handleFaceEnrollmentSuccess,
         fetchPoints,
         totalPoints,
         facilityConfig,
@@ -339,6 +390,9 @@
         fetchFacilities,
         updateFacilityConfig,
         myQRCode$,
+        faceSignInTitle$,
+        setUpFaceSignIn$,
+        removeFaceSignIn$,
       };
     },
     computed: {

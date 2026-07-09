@@ -830,6 +830,26 @@ base_option_spec = {
             """,
         },
     },
+    "Auth": {
+        "FACE_LOGIN_DISTANCE_THRESHOLD": {
+            "type": "float",
+            "default": 0.4,
+            "description": """
+                Maximum cosine distance between a probe face embedding and a user's nearest enrolled
+                sample for a face login match to be accepted. Lower values are stricter (fewer false
+                accepts, more false rejects).
+            """,
+        },
+        "FACE_LOGIN_DISTANCE_MARGIN": {
+            "type": "float",
+            "default": 0.05,
+            "description": """
+                Minimum gap in cosine distance between the best-matching user and the runner-up user
+                for a face login match to be accepted. Rejects ambiguous matches between similar-looking
+                enrolled users rather than guessing.
+            """,
+        },
+    },
 }
 
 

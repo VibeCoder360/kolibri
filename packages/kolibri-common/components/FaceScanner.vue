@@ -1,6 +1,6 @@
 <template>
 
-  <div class="qr-scanner">
+  <div class="face-scanner">
     <!--
       Live camera view. Rendered only when getUserMedia is available (HTTPS or
       localhost). On non-secure LAN deployments the camera pane is not shown.
@@ -27,10 +27,17 @@
         <div class="viewfinder-frame"></div>
       </div>
 
-      <!-- Status / instruction overlay -->
-      <div class="camera-status">
+      <!--
+        Status / instruction overlay. Hidden when idle so a stopped scanner
+        shows a plain pane rather than a stale "look at the camera" hint over
+        a black (video-hidden) pane.
+      -->
+      <div
+        v-if="status !== 'idle'"
+        class="camera-status"
+      >
         <KCircularLoader
-          v-if="status === 'starting'"
+          v-if="status === 'starting' || status === 'loading-models'"
           :delay="false"
         />
         <p>{{ statusMessage$() }}</p>
@@ -78,71 +85,63 @@
 <script>
 
   import { onBeforeUnmount, ref, computed } from 'vue';
-  import { BrowserMultiFormatReader } from '@zxing/browser';
   import { qrLoginStrings } from 'kolibri-common/strings/qrLoginStrings';
-  import sharedCameraSupported from 'kolibri-common/utils/cameraSupported';
+  import { faceLoginStrings } from 'kolibri-common/strings/faceLoginStrings';
+  import cameraSupported from 'kolibri-common/utils/cameraSupported';
   import UiAlert from 'kolibri-design-system/lib/keen/UiAlert';
   import KCircularLoader from 'kolibri-design-system/lib/loaders/KCircularLoader';
+  import { getHuman, detectSingleFace } from 'kolibri-common/utils/faceRecognition';
 
-  /**
-   * The set of QR-code-like formats we ask the decoder to accept. We restrict to
-   * square-matrix 2D formats so incidental 1D barcodes in the camera frame don't
-   * produce false positives.
-   */
-  const QR_HINT_FORMATS = ['qr_code'];
-
-  /**
-   * Native BarcodeDetector is chromium-only and not constructible in jest/jsdom;
-   * read it lazily so test environments don't blow up at import time.
-   */
-  function getNativeBarcodeDetectorConstructor() {
-    if (typeof window === 'undefined') return null;
-    return window.BarcodeDetector || null;
-  }
-
-  /**
-   * A secure context (HTTPS or localhost) is required for getUserMedia. Kolibri is
-   * frequently deployed over plain HTTP on a LAN, so we expose this so the host
-   * page can decide whether to show the camera UI. Re-exported from the shared
-   * util in kolibri-common, which the face sign-in flow also uses.
-   */
-  export const cameraSupported = sharedCameraSupported;
+  // Milliseconds between detection attempts. Keeps CPU load reasonable on
+  // low-resource devices while still feeling responsive.
+  const DETECT_INTERVAL = 400;
+  // A face must be present in this many consecutive frames before we emit an
+  // embedding — rejects blurry/transitional captures cheaply.
+  const STABLE_FRAMES = 3;
 
   export default {
-    name: 'QRScanner',
+    name: 'FaceScanner',
     components: { UiAlert, KCircularLoader },
+    props: {
+      // 'continuous' (default): auto-detect and emit once a face is stable
+      // across frames — used for sign-in. 'manual': do not auto-detect; the
+      // parent calls capture() (via template ref) to grab a single sample —
+      // used for enrollment.
+      manual: {
+        type: Boolean,
+        default: false,
+      },
+    },
     setup(props, { emit }) {
       const {
         cameraStarting$,
-        pointCameraAtCode$,
         secureContextRequired$,
         cameraPermissionDenied$,
         cameraNotFound$,
         cameraUnavailable$,
       } = qrLoginStrings;
+      const { lookAtCamera$, loadingModels$ } = faceLoginStrings;
 
       const videoRef = ref(null);
       /**
        * Scanner lifecycle status:
-       *   idle | starting | streaming | scanning
+       *   idle | starting | loading-models | streaming | scanning
        *   permission-denied | no-camera | unavailable
-       * The 'scanning' state is used while a frame-loop is actively decoding.
        */
       const status = ref('idle');
 
-      let nativeDetector = null;
-      let nativeLoopActive = false;
-      let zxingReader = null;
-      let zxingControls = null;
       let activeStream = null;
+      let loopActive = false;
+      let loopTimeout = null;
+      // Set once models finish loading; used by capture() in manual mode.
+      let loadedHuman = null;
 
       const canUseCamera = computed(() => cameraSupported());
 
       const statusMessage$ = computed(() => {
         if (status.value === 'starting') return cameraStarting$;
-        // 'streaming' / 'scanning': show the pointing hint, not just "scanning…",
-        // so the learner knows what to do.
-        return pointCameraAtCode$;
+        if (status.value === 'loading-models') return loadingModels$;
+        return lookAtCamera$;
       });
 
       async function start() {
@@ -150,10 +149,17 @@
           status.value = 'unavailable';
           return;
         }
+        // Re-entrancy guard: a second start() before the first settles would
+        // overwrite activeStream (leaking the first MediaStream's tracks) and
+        // spawn a duplicate detection loop sharing one loopTimeout handle.
+        if (['starting', 'loading-models', 'streaming', 'scanning'].includes(status.value)) {
+          return;
+        }
         status.value = 'starting';
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: 'environment' } },
+            // Selfie camera: the person signing in is facing the screen.
+            video: { facingMode: { ideal: 'user' } },
             audio: false,
           });
           activeStream = stream;
@@ -165,67 +171,90 @@
           }
           videoEl.srcObject = stream;
           await videoEl.play().catch(() => {
-            // Autoplay can race; play() rejection is recoverable once the stream
-            // has enough data, so we don't surface this as a user-facing error.
+            // Autoplay can race; play() rejection is recoverable once the
+            // stream has enough data, so we don't surface it as an error.
           });
-          status.value = 'streaming';
-          await beginDecoding(videoEl);
-        } catch (err) {
-          handleCameraError(err);
-        }
-      }
-
-      async function beginDecoding(videoEl) {
-        const NativeCtor = getNativeBarcodeDetectorConstructor();
-        if (NativeCtor) {
-          try {
-            nativeDetector = new NativeCtor({ formats: QR_HINT_FORMATS });
-            status.value = 'scanning';
-            runNativeFrameLoop(videoEl);
+          status.value = 'loading-models';
+          const human = await getHuman();
+          if (!activeStream) {
+            // stop() was called while models were loading.
             return;
-          } catch (err) {
-            // Some Chromium builds reject the format list; fall through to zxing.
-            nativeDetector = null;
           }
-        }
-        // Fallback: @zxing/browser continuous decode (works on Safari/Firefox).
-        try {
-          zxingReader = new BrowserMultiFormatReader(undefined, {
-            delayBetweenScanAttempts: 120,
-          });
+          loadedHuman = human;
           status.value = 'scanning';
-          zxingControls = await zxingReader.decodeFromVideoDevice(undefined, videoEl, result => {
-            if (result) {
-              emit('decoded', result.getText());
-            }
-          });
+          // Signal readiness so a parent (e.g. the enrollment wizard) can
+          // enable its capture control only once models are loaded.
+          emit('ready');
+          // In manual mode we wait for the parent to call capture(); otherwise
+          // run the continuous detect-and-emit loop used for sign-in.
+          if (!props.manual) {
+            runDetectionLoop(human, videoEl);
+          }
         } catch (err) {
           handleCameraError(err);
         }
       }
 
       /**
-       * Native BarcodeDetector is pull-based, so we drive it with a requestAnimationFrame
-       * loop. Sets `nativeLoopActive` to false from stop() to terminate cleanly.
+       * Grab a single face sample on demand (manual/enrollment mode). Emits
+       * 'embedding' with the descriptor on success, or 'capture-error' with an
+       * error code ('no-face' | 'multiple-faces' | 'low-quality' | 'not-ready').
        */
-      function runNativeFrameLoop(videoEl) {
-        nativeLoopActive = true;
+      async function capture() {
+        const videoEl = videoRef.value;
+        if (!loadedHuman || !videoEl || status.value !== 'scanning') {
+          emit('capture-error', 'not-ready');
+          return;
+        }
+        try {
+          const result = await detectSingleFace(loadedHuman, videoEl);
+          if (result.embedding) {
+            emit('embedding', result.embedding);
+          } else {
+            emit('capture-error', result.error);
+          }
+        } catch (err) {
+          emit('capture-error', 'low-quality');
+        }
+      }
+
+      /**
+       * Poll-based detection loop. Emits 'embedding' once a face has been
+       * present for STABLE_FRAMES consecutive attempts, then stops so the
+       * parent can prevalidate without duplicate submissions.
+       */
+      function runDetectionLoop(human, videoEl) {
+        loopActive = true;
+        let consecutive = 0;
+        let lastEmbedding = null;
         const tick = async () => {
-          if (!nativeLoopActive || !nativeDetector) return;
+          if (!loopActive) return;
           try {
-            const codes = await nativeDetector.detect(videoEl);
-            if (codes && codes.length > 0 && codes[0].rawValue) {
-              emit('decoded', codes[0].rawValue);
-              return;
+            const result = await detectSingleFace(human, videoEl);
+            if (result.embedding) {
+              consecutive += 1;
+              lastEmbedding = result.embedding;
+            } else {
+              consecutive = 0;
+              lastEmbedding = null;
             }
           } catch (err) {
             // detect() can throw on transient empty frames; just keep going.
+            consecutive = 0;
           }
-          if (nativeLoopActive) {
-            requestAnimationFrame(tick);
+          // stop()/teardown may have run during the await above; don't emit
+          // into a torn-down or navigated-away parent.
+          if (!loopActive) return;
+          if (consecutive >= STABLE_FRAMES && lastEmbedding) {
+            loopActive = false;
+            emit('embedding', lastEmbedding);
+            return;
+          }
+          if (loopActive) {
+            loopTimeout = setTimeout(tick, DETECT_INTERVAL);
           }
         };
-        requestAnimationFrame(tick);
+        tick();
       }
 
       function handleCameraError(err) {
@@ -241,13 +270,12 @@
       }
 
       function teardownStream() {
-        nativeLoopActive = false;
-        nativeDetector = null;
-        if (zxingControls) {
-          zxingControls.stop();
-          zxingControls = null;
+        loopActive = false;
+        loadedHuman = null;
+        if (loopTimeout) {
+          clearTimeout(loopTimeout);
+          loopTimeout = null;
         }
-        zxingReader = null;
         if (activeStream) {
           for (const track of activeStream.getTracks()) {
             try {
@@ -282,6 +310,8 @@
         start,
         // eslint-disable-next-line vue/no-unused-properties -- called by parent via template ref
         stop,
+        // eslint-disable-next-line vue/no-unused-properties -- called by parent via template ref
+        capture,
       };
     },
   };
@@ -291,7 +321,7 @@
 
 <style lang="scss" scoped>
 
-  .qr-scanner {
+  .face-scanner {
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -329,10 +359,10 @@
   }
 
   .viewfinder-frame {
-    width: 70%;
-    height: 70%;
+    width: 60%;
+    height: 75%;
     border: 2px solid rgba(255, 255, 255, 0.9);
-    border-radius: 8px;
+    border-radius: 50%;
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.25);
   }
 

@@ -106,7 +106,6 @@
 <script>
 
   import { computed, onMounted, onUnmounted, ref } from 'vue';
-  import { useWindowSize } from '@vueuse/core';
   import KFocusTrap from 'kolibri-design-system/lib/KFocusTrap';
   import KOverlay from 'kolibri-design-system/lib/KOverlay';
   import Backdrop from 'kolibri/components/Backdrop';
@@ -126,7 +125,13 @@
       const modalTitle = ref(null);
       const modalCard = ref(null);
       const naturalCardHeight = ref(0);
-      const { height: windowHeight } = useWindowSize();
+      // Track the viewport height with a plain resize listener rather than
+      // @vueuse/core's useWindowSize, which crashes under Vue 2.7 here
+      // (useMounted → injectHook on a null instance).
+      const windowHeight = ref(window.innerHeight);
+      function handleResize() {
+        windowHeight.value = window.innerHeight;
+      }
 
       const cardScale = computed(() => {
         if (!naturalCardHeight.value) return 1;
@@ -141,12 +146,14 @@
       const confirmBgHover = darken1(confirmBg);
 
       onMounted(() => {
+        window.addEventListener('resize', handleResize);
         document.documentElement.style.overflow = 'hidden';
         naturalCardHeight.value = modalCard.value.scrollHeight;
         confirmBtn.value.$el.focus();
       });
 
       onUnmounted(() => {
+        window.removeEventListener('resize', handleResize);
         document.documentElement.style.overflow = '';
       });
 

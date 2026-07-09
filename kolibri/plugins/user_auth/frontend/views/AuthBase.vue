@@ -120,6 +120,20 @@
                   />
                 </p>
                 <p
+                  v-if="showFaceSignInOption"
+                  class="alternative-link small-text"
+                  :style="{
+                    borderColor: $themeTokens.text,
+                  }"
+                >
+                  <KRouterLink
+                    :text="signInWithFace$()"
+                    :to="faceSignInRoute"
+                    :primary="true"
+                    appearance="basic-link"
+                  />
+                </p>
+                <p
                   v-if="showQRSignInOption"
                   class="alternative-link small-text"
                   :style="{
@@ -248,6 +262,7 @@
   import { OptionsForSignIn } from 'kolibri-common/constants/Auth';
   import { picturePasswordStrings } from 'kolibri-common/strings/picturePasswords';
   import { qrLoginStrings } from 'kolibri-common/strings/qrLoginStrings';
+  import { faceLoginStrings } from 'kolibri-common/strings/faceLoginStrings';
   import loginComponents from 'kolibri-common/utils/loginComponents';
   import urls from 'kolibri/urls';
   import plugin_data from 'kolibri-plugin-data';
@@ -264,12 +279,19 @@
     mixins: [commonCoreStrings, commonUserStrings],
     setup(props) {
       const route = useRoute();
-      const { nextParam, pictureSignInRoute, usernameSignInRoute, qrSignInRoute, signUpRoute } =
-        useAuthRouter(route);
+      const {
+        nextParam,
+        pictureSignInRoute,
+        usernameSignInRoute,
+        qrSignInRoute,
+        faceSignInRoute,
+        signUpRoute,
+      } = useAuthRouter(route);
       const { canSignUp, signInOptions, signInMethod } = useAuthFlow();
       const { isAppContext } = useUser();
       const { enterUsername$, enterPictures$ } = picturePasswordStrings;
       const { signInWithQRCode$ } = qrLoginStrings;
+      const { signInWithFace$ } = faceLoginStrings;
 
       const allowAccess = computed(() => {
         return plugin_data.allowRemoteAccess || isAppContext.value;
@@ -292,13 +314,23 @@
           signInMethod.value !== OptionsForSignIn.QR_LOGIN
         );
       });
-      // When the user is on the QR sign-in page, show a link to switch back
-      // to username/password sign-in. Without this, the user would be stuck
-      // on the QR page with no way to reach username login.
+      // Face sign-in is offered as an additional option alongside whatever
+      // the current method is. Hidden when face is the current method or not
+      // available (facility disabled, or no camera / insecure context).
+      const showFaceSignInOption = computed(() => {
+        return (
+          !props.hideFacilityBasedOptions &&
+          signInOptions.value.includes(OptionsForSignIn.FACE_LOGIN) &&
+          signInMethod.value !== OptionsForSignIn.FACE_LOGIN
+        );
+      });
+      // When the user is on a camera-based sign-in page (QR or face), show a
+      // link to switch back to username/password sign-in. Without this, the
+      // user would be stuck with no way to reach username login.
       const showUsernameSignInOption = computed(() => {
         return (
           !props.hideFacilityBasedOptions &&
-          signInMethod.value === OptionsForSignIn.QR_LOGIN
+          [OptionsForSignIn.QR_LOGIN, OptionsForSignIn.FACE_LOGIN].includes(signInMethod.value)
         );
       });
 
@@ -331,10 +363,13 @@
         showCreateAccountButton,
         alternateSignInRoute,
         showQRSignInOption,
+        showFaceSignInOption,
         showUsernameSignInOption,
         qrSignInRoute,
+        faceSignInRoute,
         usernameSignInRoute,
         signInWithQRCode$,
+        signInWithFace$,
         enterUsername$,
         deviceUnusableReason,
         showLandscapeLayout,

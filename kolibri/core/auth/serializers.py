@@ -399,6 +399,7 @@ class FacilityDatasetSerializer(serializers.ModelSerializer):
             "show_download_button_in_learn",
             "enable_mark_attendance",
             "enable_qr_login",
+            "enable_face_login",
             "extra_fields",
             "picture_password_settings",
             "description",

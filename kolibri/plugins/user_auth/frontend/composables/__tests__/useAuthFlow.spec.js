@@ -184,6 +184,38 @@ describe('useAuthFlow', () => {
       expect(signInMethod.value).toBe(OptionsForSignIn.PICTURE_PASSWORD);
     });
 
+    it('defaults to FACE_LOGIN ahead of picture password when available', () => {
+      useFacilityConfig.mockReturnValue(
+        useFacilityConfigMock({
+          signInOptions: computed(() => [
+            OptionsForSignIn.FACE_LOGIN,
+            OptionsForSignIn.PICTURE_PASSWORD,
+            OptionsForSignIn.USERNAME_PASSWORD,
+          ]),
+        }),
+      );
+      persistentSignInMethod.value = null;
+
+      const { signInMethod } = createAuthFlow();
+      expect(signInMethod.value).toBe(OptionsForSignIn.FACE_LOGIN);
+    });
+
+    it('honors a persisted non-face choice even when face login is available', () => {
+      useFacilityConfig.mockReturnValue(
+        useFacilityConfigMock({
+          signInOptions: computed(() => [
+            OptionsForSignIn.FACE_LOGIN,
+            OptionsForSignIn.PICTURE_PASSWORD,
+            OptionsForSignIn.USERNAME_PASSWORD,
+          ]),
+        }),
+      );
+      persistentSignInMethod.value = OptionsForSignIn.PICTURE_PASSWORD;
+
+      const { signInMethod } = createAuthFlow();
+      expect(signInMethod.value).toBe(OptionsForSignIn.PICTURE_PASSWORD);
+    });
+
     it('defaults to the first option if picture password is not enabled', () => {
       useFacilityConfig.mockReturnValue(
         useFacilityConfigMock({

@@ -88,7 +88,7 @@ importers:
         version: 8.2.2
       jest:
         specifier: ^30.2.0
-        version: 30.2.0(@types/node@25.7.0)
+        version: 30.2.0(@types/node@25.0.9)
       jest-environment-jsdom:
         specifier: ^30.2.0
         version: 30.2.0
@@ -1296,6 +1296,9 @@ importers:
       '@shopify/draggable':
         specifier: 1.0.0-beta.8
         version: 1.0.0-beta.8
+      '@vladmandic/human':
+        specifier: 3.2.2
+        version: 3.2.2
       '@vueuse/core':
         specifier: 'catalog:'
         version: 11.3.0(vue@2.7.16)
@@ -1576,7 +1579,7 @@ importers:
         version: 1.2.5
       jest:
         specifier: ^30.2.0
-        version: 30.2.0(@types/node@25.0.9)
+        version: 30.2.0(@types/node@25.7.0)
       jest-environment-jsdom:
         specifier: ^30.2.0
         version: 30.2.0
@@ -3839,6 +3842,10 @@ packages:
 
   '@videojs/xhr@2.6.0':
     resolution: {integrity: sha512-7J361GiN1tXpm+gd0xz2QWr3xNWBE+rytvo8J3KuggFaLg+U37gZQ2BuPLcnkfGffy2e+ozY70RHC8jt7zjA6Q==}
+
+  '@vladmandic/human@3.2.2':
+    resolution: {integrity: sha512-D9Gv7l2kv8eULs8vDlatpqxWfEySNn4ffuXmJkQ/Js72xIC2RHG3W7ubffI/C6UlRVuN/f1pLZAGf1b/ELKpHg==}
+    engines: {node: '>=14.0.0'}
 
   '@vue/compiler-sfc@2.7.16':
     resolution: {integrity: sha512-KWhJ9k5nXuNtygPU7+t1rX6baZeqOYLEforUPjgNDBnLicfHCoi48H87Q8XyLZOrNNsmhuwKqtpDQWjEFe6Ekg==}
@@ -12133,6 +12140,8 @@ snapshots:
       '@babel/runtime': 7.29.2
       global: 4.4.0
       is-function: 1.0.2
+
+  '@vladmandic/human@3.2.2': {}
 
   '@vue/compiler-sfc@2.7.16':
     dependencies:
